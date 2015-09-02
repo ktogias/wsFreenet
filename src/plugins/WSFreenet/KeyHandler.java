@@ -7,11 +7,16 @@ package plugins.WSFreenet;
 
 import freenet.clients.fcp.FCPPluginConnection;
 import freenet.clients.fcp.FCPPluginMessage;
+import freenet.crypt.RandomSource;
+import freenet.keys.FreenetURI;
+import freenet.keys.InsertableClientSSK;
 import freenet.pluginmanager.FredPluginFCPMessageHandler;
 import freenet.pluginmanager.PluginNotFoundException;
 import freenet.pluginmanager.PluginRespirator;
 import freenet.support.SimpleFieldSet;
 import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.java_websocket.WebSocket;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
@@ -20,7 +25,7 @@ import org.json.simple.parser.ParseException;
  *
  * @author ktogias
  */
-public class KeyHandler extends Handler{
+public class KeyHandler extends Handler {
 
     public KeyHandler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName) {
         super(ws, message, pr, indynetPluginName);
@@ -29,34 +34,31 @@ public class KeyHandler extends Handler{
     @Override
     public void handle() {
         try {
-            JSONObject m = parseJSONMessage(message);
-            String action = (String)m.get("action");
-            if (action == null){
-                sendMissingFieldErrorReply("No action specified!");
-                return;
-            }
-            if (action.equalsIgnoreCase("register")){
-                handleRegister(m);
-            }
-            else if (action.equalsIgnoreCase("resolve")){
-                handleResolve(m);
-            }
-            else {
+            super.handle();
+            if (action.equalsIgnoreCase("register")) {
+                handleRegister();
+            } else if (action.equalsIgnoreCase("resolve")) {
+                handleResolve();
+            } else if (action.equalsIgnoreCase("generate")){
+                handleGenerate();
+            } else {
                 sendActionNotImplementedErrorReply();
             }
         } catch (ParseException ex) {
             sendJsonParseErrorReply();
-        } 
+        } catch (MissingFieldException ex) {
+            sendMissingFieldErrorReply(ex.getMessage());
+        }
     }
-    
-    public void handleRegister (JSONObject m){
-        String name = (String)m.get("name");
-        if (name == null){
+
+    private void handleRegister() {
+        String name = (String) jsonmessage.get("name");
+        if (name == null) {
             this.sendMissingFieldErrorReply("Missing name field!");
             return;
         }
-        String requestKey = (String)m.get("requestKey");
-        if (requestKey == null){
+        String requestKey = (String) jsonmessage.get("requestKey");
+        if (requestKey == null) {
             this.sendMissingFieldErrorReply("Missing requestKey field!");
             return;
         }
@@ -68,8 +70,8 @@ public class KeyHandler extends Handler{
             sendActionNotImplementedErrorReply("Indynet plugin is nit loaded!");
         }
     }
-    
-    public void register (String name, String requestKey) throws IOException, PluginNotFoundException{
+
+    private void register(String name, String requestKey) throws IOException, PluginNotFoundException {
         FCPPluginConnection connection = pr.connectToOtherPlugin(indynetPluginName, new RegisterCallback());
         SimpleFieldSet params = new SimpleFieldSet(false);
         params.putSingle("action", "resolver.register");
@@ -78,10 +80,10 @@ public class KeyHandler extends Handler{
         FCPPluginMessage fcpMessage = FCPPluginMessage.construct(params, null);
         connection.send(fcpMessage);
     }
-    
-    public void handleResolve(JSONObject m){
-        String name = (String)m.get("name");
-        if (name == null){
+
+    private void handleResolve() {
+        String name = (String) jsonmessage.get("name");
+        if (name == null) {
             this.sendMissingFieldErrorReply("Missing name field!");
             return;
         }
@@ -93,8 +95,8 @@ public class KeyHandler extends Handler{
             sendServerErrorReply();
         }
     }
-    
-    public void resolve(String name) throws PluginNotFoundException, IOException{
+
+    private void resolve(String name) throws PluginNotFoundException, IOException {
         FCPPluginConnection connection = pr.connectToOtherPlugin(indynetPluginName, new ResolveCallback());
         SimpleFieldSet params = new SimpleFieldSet(false);
         params.putSingle("action", "resolver.resolve");
@@ -103,35 +105,86 @@ public class KeyHandler extends Handler{
         connection.send(fcpMessage);
     }
     
+    private void handleGenerate() {
+        String type = (String) jsonmessage.get("type");
+        if (type == null) {
+            this.sendMissingFieldErrorReply("Missing type field!");
+            return;
+        }
+        String filename = (String) jsonmessage.getOrDefault("filename", "");
+        int version = ((Long) jsonmessage.getOrDefault("version", new Long(0))).intValue();
+        if (version < 0){
+            this.sendWrongFieldValueErrorReply("Version number must not be negative");
+            return;
+        }
+        if (type.equalsIgnoreCase("USK") && filename.isEmpty()){
+            this.sendMissingFieldErrorReply("Filename is required for USK key generation, filename field is missing");
+            return;
+        }
+        generate(type, filename, version);
+    }
+    
+    private void generate(String type, String filename, int version){
+        if (!type.equalsIgnoreCase("SSK") && !type.equalsIgnoreCase("USK")){
+            this.sendErrorReply("not supported", "Generation of requested type of key is not supported.");
+            return;
+        }
+        final RandomSource r = pr.getNode().random;
+        if (!filename.isEmpty()){
+            filename+="-"+version;
+        }
+        InsertableClientSSK key = InsertableClientSSK.createRandom(r, filename);
+        FreenetURI insertURI = key.getInsertURI();
+        FreenetURI requestURI = key.getURI();
+        if (type.equalsIgnoreCase("USK")){
+            insertURI = insertURI.uskForSSK();
+            requestURI = requestURI.uskForSSK();
+        }
+        JSONObject response = createJSONReplyMessage("success");
+        response.put("insertURI", insertURI.toString());
+        response.put("requestURI", requestURI.toString());
+        ws.send(response.toJSONString());
+    }
+
     private class RegisterCallback implements FredPluginFCPMessageHandler.ClientSideFCPMessageHandler {
-        
+
         @Override
         public FCPPluginMessage handlePluginFCPMessage(FCPPluginConnection fcppc, FCPPluginMessage fcppm) {
-            if (fcppm.success){
-                JSONObject response = new JSONObject();
+            if (fcppm.success) {
+                JSONObject response = createJSONReplyMessage("success");
                 response.put("resolveURI", fcppm.params.get("resolveURI"));
                 ws.send(response.toJSONString());
-            }
-            else {
-                sendServerErrorReply(fcppm.errorCode+" "+fcppm.errorMessage);
+            } else {
+                sendServerErrorReply(fcppm.errorCode + " " + fcppm.errorMessage);
             }
             return FCPPluginMessage.construct();
-        }      
+        }
     }
-    
+
     private class ResolveCallback implements FredPluginFCPMessageHandler.ClientSideFCPMessageHandler {
-        
+
         @Override
         public FCPPluginMessage handlePluginFCPMessage(FCPPluginConnection fcppc, FCPPluginMessage fcppm) {
-            if (fcppm.success){
-                ws.send(fcppm.params.get("json"));
-            }
-            else {
-                sendServerErrorReply(fcppm.errorCode+" "+fcppm.errorMessage);
+            if (fcppm.success) {
+                JSONObject response = createJSONReplyMessage("found");
+                try {
+                    JSONObject resolveObject = parseJSONMessage(fcppm.params.get("json"));
+                    response.put("answer", resolveObject);
+                    ws.send(response.toJSONString());
+                } catch (ParseException ex) {
+                    sendJsonParseErrorReply("Error parshing returned object!");
+                }
+                
+            } else {
+                JSONObject response = createJSONReplyMessage("not found");
+                JSONObject answer = new JSONObject();
+                answer.put("errorcode", fcppm.errorCode);
+                answer.put("errormessage", fcppm.errorMessage);
+                response.put("answer", answer);
+                ws.send(response.toJSONString());
             }
             return FCPPluginMessage.construct();
-        }      
+        }
     }
-    
-    
+
 }

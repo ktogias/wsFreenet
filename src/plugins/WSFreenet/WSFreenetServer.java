@@ -5,6 +5,7 @@
  */
 package plugins.WSFreenet;
 
+import freenet.io.AllowedHosts;
 import freenet.pluginmanager.PluginRespirator;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -21,25 +22,27 @@ import org.java_websocket.server.WebSocketServer;
  * @author ktogias
  */
 public class WSFreenetServer extends WebSocketServer {
-    String[] allowedHosts;
+    AllowedHosts allowedHosts;
     PluginRespirator pr;
     String indynetPluginName;
 
     public WSFreenetServer( int port, String[] allowedHosts, PluginRespirator pr, String indynetPluginName) throws UnknownHostException {
         super( new InetSocketAddress( port ) );
-        this.allowedHosts = allowedHosts;
+        this.allowedHosts = new AllowedHosts(String.join(",", allowedHosts));
         this.pr = pr;
         this.indynetPluginName = indynetPluginName;
     }
 
-    public WSFreenetServer( InetSocketAddress address, String[] allowedHosts  ) {
+    public WSFreenetServer( InetSocketAddress address, String[] allowedHosts, PluginRespirator pr, String indynetPluginName  ) {
         super( address );
+        this.allowedHosts = new AllowedHosts(String.join(",", allowedHosts));
+        this.pr = pr;
+        this.indynetPluginName = indynetPluginName;
     }
     
     @Override
     public void onOpen(WebSocket ws, ClientHandshake ch) {
-        String remoteAddress = ws.getRemoteSocketAddress().getAddress().getHostAddress();
-        if (!Arrays.asList(allowedHosts).contains(remoteAddress)){
+        if (!allowedHosts.allowed(ws.getRemoteSocketAddress().getAddress())){
             ws.closeConnection(-1, "Not Allowed");
         }
     }
@@ -61,7 +64,7 @@ public class WSFreenetServer extends WebSocketServer {
         } catch (IllegalArgumentException ex) {
             ws.send(Util.getBadRequestErrorReply().toJSONString());
         } catch (Exception ex) {
-            ws.send(Util.getServerErrorReply().toJSONString());
+            ws.send(Util.getServerErrorReply(ex.getMessage()).toJSONString());
             Logger.getLogger(WSFreenetServer.class.getName()).log(Level.SEVERE, null, ex);
         }
     }

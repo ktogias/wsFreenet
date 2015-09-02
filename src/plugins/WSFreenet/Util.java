@@ -34,9 +34,8 @@ public class Util {
     }
     
     static public void debug(String filename, String message){
-        PrintWriter writer = null;
         try {
-            writer = new PrintWriter(filename, "UTF-8");
+            PrintWriter writer = new PrintWriter(filename, "UTF-8");
             writer.println(message);
             writer.close();
         } catch (FileNotFoundException ex) {
@@ -72,45 +71,60 @@ public class Util {
         return json;
     }
     
-    static public JSONObject getErrorReply(int code, String message){
+    static public JSONObject getErrorReply(String refmid, String code, String message){
         JSONObject reply = new JSONObject();
-        reply.put("error", true);
-        reply.put("code", code);
-        reply.put("message", message);
+        reply.put("type", "reply");
+        if (refmid != null){
+            reply.put("refmid", refmid);
+        }
+        reply.put("result", "error");
+        reply.put("errorcode", code);
+        reply.put("errormessage", message);
         return reply;
     }
     
-    
     static public JSONObject getNotFoundErrorReply(){
-        return getNotFoundErrorReply("Resource not found!");
+        return getNotFoundErrorReply(null);
     }
     
-    static public JSONObject getNotFoundErrorReply(String message){
-        return getErrorReply(404, message);
+    static public JSONObject getNotFoundErrorReply(String refmid){
+        return getNotFoundErrorReply(refmid, "Resource not found!");
+    }
+    
+    static public JSONObject getNotFoundErrorReply(String refmid, String message){
+        return getErrorReply(refmid,"404", message);
     }
     
     static public JSONObject getBadRequestErrorReply(){
-        return getBadRequestErrorReply("Bad request!");
+        return getBadRequestErrorReply(null);
     }
     
-    static public JSONObject getBadRequestErrorReply(String message){
-        return getErrorReply(400, message);
+    static public JSONObject getBadRequestErrorReply(String refmid){
+        return getBadRequestErrorReply(refmid, "Bad request!");
+    }
+    
+    static public JSONObject getBadRequestErrorReply(String refmid, String message){
+        return getErrorReply(refmid, "400", message);
     }
     
     static public JSONObject getServerErrorReply(){
-        return getServerErrorReply("Server error!");
+        return getServerErrorReply(null);
     }
     
-    static public JSONObject getServerErrorReply(String message){
-        return getErrorReply(500, message);
+    static public JSONObject getServerErrorReply(String refmid){
+        return getServerErrorReply(refmid, "Server error!");
     }
     
-    static public JSONObject getNotImplementedErrorReply(){
-        return getServerErrorReply("Not Implemented!");
+    static public JSONObject getServerErrorReply(String refmid, String message){
+        return getErrorReply(refmid, "500", message);
     }
     
-    static public JSONObject getNotImplementedErrorReply(String message){
-        return getErrorReply(501, message);
+    static public JSONObject getNotImplementedErrorReply(String refmid){
+        return getServerErrorReply(refmid, "Not Implemented!");
+    }
+    
+    static public JSONObject getNotImplementedErrorReply(String refmid, String message){
+        return getErrorReply(refmid, "501", message);
     }
     
     
