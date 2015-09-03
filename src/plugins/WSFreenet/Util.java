@@ -55,12 +55,12 @@ public class Util {
         return handlerInstance;
     }
     
-    static public Handler getHandler(String resource, WebSocket ws, ByteBuffer data, PluginRespirator pr) throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException{
-        resource = resource.substring(0,1).toUpperCase() + resource.substring(1).toLowerCase();
-        Class<?> handler = Class.forName(resource+"Handler");
-        Class[] types = {WebSocket.class, ByteBuffer.class, PluginRespirator.class};
+    static public Handler getHandler(String resource, WebSocket ws, ByteBuffer data, PluginRespirator pr, String indynetPluginName) throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException{
+        resource = resource.substring(1,2).toUpperCase() + resource.substring(2).toLowerCase();
+        Class<?> handler = Class.forName("plugins.WSFreenet."+resource+"Handler");
+        Class[] types = {WebSocket.class, ByteBuffer.class, PluginRespirator.class, String.class};
         Constructor constructor = handler.getConstructor(types);
-        Object[] parameters = {ws, data, pr};
+        Object[] parameters = {ws, data, pr, indynetPluginName};
         Handler handlerInstance = (Handler)constructor.newInstance(parameters);
         return handlerInstance;
     }

@@ -64,7 +64,7 @@ public class WSFreenetServer extends WebSocketServer {
         } catch (IllegalArgumentException ex) {
             ws.send(Util.getBadRequestErrorReply().toJSONString());
         } catch (Exception ex) {
-            ws.send(Util.getServerErrorReply(ex.getMessage()).toJSONString());
+            ws.send(Util.getServerErrorReply(null,ex.getMessage()).toJSONString());
             Logger.getLogger(WSFreenetServer.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
@@ -73,7 +73,7 @@ public class WSFreenetServer extends WebSocketServer {
     public void onMessage(WebSocket ws, ByteBuffer data) {
         try {
             String resource = ws.getResourceDescriptor();
-            Handler handler = Util.getHandler(resource, ws, data, pr);
+            Handler handler = Util.getHandler(resource, ws, data, pr, indynetPluginName);
             handler.handle();
         } catch (ClassNotFoundException ex) {
             ws.close(404, "Resource not found");

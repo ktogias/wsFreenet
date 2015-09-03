@@ -52,6 +52,8 @@ public abstract class Handler {
                 throw new MissingFieldException("No action specified!");
             }
         }
+        else if (data != null){
+        }
     }
     
     public void sendErrorReply(String code, String message){
