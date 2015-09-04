@@ -5,9 +5,13 @@
  */
 package plugins.WSFreenet;
 
+import freenet.clients.fcp.FCPPluginConnection;
+import freenet.clients.fcp.FCPPluginMessage;
 import freenet.pluginmanager.FredPlugin;
+import freenet.pluginmanager.FredPluginFCPMessageHandler;
 import freenet.pluginmanager.FredPluginThreadless;
 import freenet.pluginmanager.PluginRespirator;
+import freenet.support.SimpleFieldSet;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
@@ -24,12 +28,14 @@ import org.json.simple.parser.ParseException;
  *
  * @author ktogias
  */
-public class WSFreenet implements FredPlugin, FredPluginThreadless{
+public class WSFreenet implements FredPlugin, FredPluginThreadless, FredPluginFCPMessageHandler.ServerSideFCPMessageHandler{
 
     PluginRespirator pr; 
     WSFreenetServer server;
     final static String CONFIG_FILE = "wsfreenet.config.json";
     final static String INDYNET_PLUGIN_NAME = "plugins.Indynet.Indynet";
+    Integer serverPort;
+    Boolean serverStarted = false;
     
     @Override
     public void terminate() {
@@ -49,10 +55,11 @@ public class WSFreenet implements FredPlugin, FredPluginThreadless{
             URI uri = new URI(url);
             Integer freenetPort = uri.getPort();
             JSONObject config = readJsonConfig();
-            Integer port = ((Long)config.getOrDefault("port", freenetPort.longValue()+1)).intValue();
+            serverPort = ((Long)config.getOrDefault("port", freenetPort.longValue()+1)).intValue();
             String [] allowedHosts = Util.JSONArrayToStringArray((JSONArray)config.getOrDefault("allowedHosts", new JSONArray()));
-            server = new WSFreenetServer(port, allowedHosts, pr, INDYNET_PLUGIN_NAME);
+            server = new WSFreenetServer(serverPort, allowedHosts, pr, INDYNET_PLUGIN_NAME);
             server.start();
+            serverStarted = true;
         } catch (URISyntaxException ex) {
             Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
@@ -66,6 +73,30 @@ public class WSFreenet implements FredPlugin, FredPluginThreadless{
         JSONParser parser = new JSONParser();
         JSONObject config = (JSONObject) parser.parse(new FileReader(CONFIG_FILE));
         return config;
+    }
+
+    @Override
+    public FCPPluginMessage handlePluginFCPMessage(FCPPluginConnection fcppc, FCPPluginMessage fcppm) {
+        String action = fcppm.params.get("action");
+        if (action.equalsIgnoreCase("getstatus")){
+            SimpleFieldSet params = new SimpleFieldSet(false);
+            params.put("serverPort", serverPort);
+            params.put("serverStarted", serverStarted);
+            return FCPPluginMessage.constructReplyMessage(fcppm, params, null, true, "", "");
+        }
+        else if (action.equalsIgnoreCase("getserverport")){
+            SimpleFieldSet params = new SimpleFieldSet(false);
+            params.put("serverPort", serverPort);
+            return FCPPluginMessage.constructReplyMessage(fcppm, params, null, true, "", "");
+        }
+        else if (action.equalsIgnoreCase("getserverstarted")){
+            SimpleFieldSet params = new SimpleFieldSet(false);
+            params.put("serverStarted", serverStarted);
+            return FCPPluginMessage.constructReplyMessage(fcppm, params, null, true, "", "");
+        }
+        else {
+            return FCPPluginMessage.constructErrorReply(fcppm, "NOT_SUPPORTED", "WSFreenet: Action not supported.");
+        }
     }
     
 }
