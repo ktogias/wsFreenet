@@ -7,6 +7,7 @@ package plugins.WSFreenet;
 
 import freenet.pluginmanager.PluginRespirator;
 import java.nio.ByteBuffer;
+import java.util.List;
 import org.java_websocket.WebSocket;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
@@ -24,20 +25,23 @@ public abstract class Handler {
     protected String refmid;
     protected String action;
     protected JSONObject jsonmessage;
+    protected List<DataInsert> dataInserts;
     
     
-    public Handler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName){
+    public Handler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts){
         this.ws = ws;
         this.message = message;
         this.pr = pr;
         this.indynetPluginName = indynetPluginName;
+        this.dataInserts = dataInserts;
     }
     
-    public Handler(WebSocket ws, ByteBuffer data, PluginRespirator pr, String indynetPluginName){
+    public Handler(WebSocket ws, ByteBuffer data, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts){
         this.ws = ws;
         this.data = data;
         this.pr = pr;
         this.indynetPluginName = indynetPluginName;
+        this.dataInserts = dataInserts;
     }
     
     public void handle() throws ParseException, MissingFieldException{
@@ -126,6 +130,18 @@ public abstract class Handler {
         response.put("refmid", refmid);
         response.put("result", result.toLowerCase());
         return response;
+    }
+    
+    List<DataInsert> getDataInserts(){
+        return dataInserts;
+    }
+    
+    PluginRespirator getPluginRespirator(){
+        return pr;
+    }
+    
+    WebSocket getWebSocket(){
+        return ws;
     }
 
 }

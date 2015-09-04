@@ -15,8 +15,7 @@ import freenet.pluginmanager.PluginNotFoundException;
 import freenet.pluginmanager.PluginRespirator;
 import freenet.support.SimpleFieldSet;
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.List;
 import org.java_websocket.WebSocket;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
@@ -27,8 +26,8 @@ import org.json.simple.parser.ParseException;
  */
 public class KeyHandler extends Handler {
 
-    public KeyHandler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName) {
-        super(ws, message, pr, indynetPluginName);
+    public KeyHandler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts) {
+        super(ws, message, pr, indynetPluginName, dataInserts);
     }
 
     @Override

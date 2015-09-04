@@ -17,6 +17,11 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.json.simple.JSONArray;
@@ -36,11 +41,13 @@ public class WSFreenet implements FredPlugin, FredPluginThreadless, FredPluginFC
     final static String INDYNET_PLUGIN_NAME = "plugins.Indynet.Indynet";
     Integer serverPort;
     Boolean serverStarted = false;
+    Map<Integer, List<DataInsert>> dataInserts;
     
     @Override
     public void terminate() {
         try {
             server.stop();
+            dataInserts.clear();
         } catch (IOException ex) {
             Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
         } catch (InterruptedException ex) {
@@ -51,13 +58,14 @@ public class WSFreenet implements FredPlugin, FredPluginThreadless, FredPluginFC
     @Override
     public void runPlugin(PluginRespirator pr) {
         try {
+            dataInserts = new ConcurrentHashMap<Integer, List<DataInsert>>();
             String url = pr.getToadletContainer().getURL();
             URI uri = new URI(url);
             Integer freenetPort = uri.getPort();
             JSONObject config = readJsonConfig();
             serverPort = ((Long)config.getOrDefault("port", freenetPort.longValue()+1)).intValue();
             String [] allowedHosts = Util.JSONArrayToStringArray((JSONArray)config.getOrDefault("allowedHosts", new JSONArray()));
-            server = new WSFreenetServer(serverPort, allowedHosts, pr, INDYNET_PLUGIN_NAME);
+            server = new WSFreenetServer(serverPort, allowedHosts, pr, INDYNET_PLUGIN_NAME, dataInserts);
             server.start();
             serverStarted = true;
         } catch (URISyntaxException ex) {
