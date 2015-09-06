@@ -59,7 +59,7 @@ class InsertCallback implements ClientPutCallback, RequestClient{
     public void onGeneratedURI(FreenetURI furi, BaseClientPutter bcp) {
         JSONObject response = insertObject.getHandler().createJSONReplyMessage("status");
         response.put("triger", "onGeneratedURI");
-        response.put("URI", furi);
+        response.put("URI", furi.toString());
         response.put("MinSuccessFetchBlocks", bcp.getMinSuccessFetchBlocks());
         response.put("LatestSuccess", bcp.getLatestSuccess());
         insertObject.getHandler().getWebSocket().send(response.toJSONString());
@@ -87,14 +87,16 @@ class InsertCallback implements ClientPutCallback, RequestClient{
     @Override
     public void onSuccess(BaseClientPutter bcp) {
         JSONObject response = insertObject.getHandler().createJSONReplyMessage("success");
-        response.put("requestURI", bcp.getURI());
+        response.put("requestURI", bcp.getURI().toString());
         insertObject.getHandler().getWebSocket().send(response.toJSONString());
         bucket.free();
+        insertObject.getHandler().getDataInserts().remove(insertObject);
     }
 
     @Override
     public void onFailure(InsertException ie, BaseClientPutter bcp) {
         insertObject.getHandler().sendErrorReply("INSERT_FAILURE", "Insert failed");
+        insertObject.getHandler().getDataInserts().remove(insertObject);
     }
 
     @Override

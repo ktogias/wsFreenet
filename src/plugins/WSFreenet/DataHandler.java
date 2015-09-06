@@ -46,6 +46,12 @@ public class DataHandler extends Handler{
                 else if (action.equalsIgnoreCase("clearqueue")) {
                     handleClearQueue();
                 }
+                else if (action.equalsIgnoreCase("canreceivemetadata")){
+                    handleCanReceiveMetadata();
+                }
+                else if (action.equalsIgnoreCase("canreceivedata")){
+                    handleCanReceiveData();
+                }
                 else {
                     sendActionNotImplementedErrorReply();
                 }
@@ -126,4 +132,37 @@ public class DataHandler extends Handler{
         }
     }
     
+    private void handleCanReceiveMetadata() {
+        try {
+            DataInsert lastInsert;
+            JSONObject response = createJSONReplyMessage("value");
+            if (dataInserts.isEmpty() || (lastInsert = dataInserts.get(dataInserts.size()-1)).hasGotData()){
+                response.put("value", true);
+            }
+            else {
+                response.put("value", false);
+            }
+            ws.send(response.toJSONString());
+        }
+        catch (Exception ex){
+            this.sendServerErrorReply(ex.getMessage()+" "+ex.toString());
+        }
+    }
+    
+    private void handleCanReceiveData() {
+        try {
+            DataInsert lastInsert;
+            JSONObject response = createJSONReplyMessage("value");
+            if (dataInserts.isEmpty() || (lastInsert = dataInserts.get(dataInserts.size()-1)).hasGotData()){
+                response.put("value", false);
+            }
+            else {
+                response.put("value", true);
+            }
+            ws.send(response.toJSONString());
+        }
+        catch (Exception ex){
+            this.sendServerErrorReply(ex.getMessage()+" "+ex.toString());
+        }
+    }
 }
