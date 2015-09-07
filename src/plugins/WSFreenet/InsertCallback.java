@@ -13,11 +13,17 @@ import freenet.client.async.ClientPutCallback;
 import freenet.client.async.ClientPutter;
 import freenet.client.events.ClientEvent;
 import freenet.client.events.ClientEventListener;
+import freenet.client.events.ExpectedHashesEvent;
+import freenet.client.events.FinishedCompressionEvent;
+import freenet.client.events.SplitfileProgressEvent;
+import freenet.client.events.StartedCompressionEvent;
 import freenet.keys.FreenetURI;
 import freenet.node.RequestClient;
 import freenet.support.api.Bucket;
 import freenet.support.api.RandomAccessBucket;
 import freenet.support.io.ResumeFailedException;
+import java.sql.Timestamp;
+import java.util.TimeZone;
 import org.json.simple.JSONObject;
 
 /**
@@ -62,30 +68,23 @@ class InsertCallback implements ClientPutCallback, RequestClient, ClientEventLis
 
     @Override
     public void onGeneratedURI(FreenetURI furi, BaseClientPutter bcp) {
-        JSONObject response = insertObject.getHandler().createJSONReplyMessage("status");
-        response.put("triger", "onGeneratedURI");
+        JSONObject response = insertObject.getHandler().createJSONReplyMessage("progress");
+        response.put("event", "GeneratedURI");
         response.put("URI", furi.toString());
-        response.put("MinSuccessFetchBlocks", bcp.getMinSuccessFetchBlocks());
-        response.put("LatestSuccess", bcp.getLatestSuccess());
         insertObject.getHandler().getWebSocket().send(response.toJSONString());
     }
 
     @Override
     public void onGeneratedMetadata(Bucket bucket, BaseClientPutter bcp) {
-        JSONObject response = insertObject.getHandler().createJSONReplyMessage("status");
-        response.put("triger", "onGeneratedMetadata");
-        response.put("MinSuccessFetchBlocks", bcp.getMinSuccessFetchBlocks());
-        response.put("LatestSuccess", bcp.getLatestSuccess());
-        response.put("bucketsize", bucket.size());
+        JSONObject response = insertObject.getHandler().createJSONReplyMessage("progress");
+        response.put("event", "GeneratedMetadata");
         insertObject.getHandler().getWebSocket().send(response.toJSONString());
     }
 
     @Override
     public void onFetchable(BaseClientPutter bcp) {
-        JSONObject response = insertObject.getHandler().createJSONReplyMessage("status");
-        response.put("triger", "onFetchable");
-        response.put("MinSuccessFetchBlocks", bcp.getMinSuccessFetchBlocks());
-        response.put("LatestSuccess", bcp.getLatestSuccess());
+        JSONObject response = insertObject.getHandler().createJSONReplyMessage("progress");
+        response.put("event", "Fetchable");
         insertObject.getHandler().getWebSocket().send(response.toJSONString());
     }
 
@@ -128,13 +127,79 @@ class InsertCallback implements ClientPutCallback, RequestClient, ClientEventLis
 
     @Override
     public void receive(ClientEvent ce, ClientContext cc) {
-        JSONObject response = insertObject.getHandler().createJSONReplyMessage("status");
-        response.put("triger", "receive");
-        response.put("event", ce.getClass());
-        insertObject.getHandler().getWebSocket().send(response.toJSONString());
+        if(ce instanceof SplitfileProgressEvent) {
+            handleEvent((SplitfileProgressEvent)ce);
+        }
+        else if (ce instanceof StartedCompressionEvent){
+            handleEvent((StartedCompressionEvent)ce);
+        }
+        else if (ce instanceof FinishedCompressionEvent){
+            handleEvent((FinishedCompressionEvent)ce);
+        }
+        else if (ce instanceof ExpectedHashesEvent){
+            handleEvent((ExpectedHashesEvent)ce);
+        }
+        else {
+            handleEvent(ce);
+        }
+        
+        
     }
 
     public void subscribeToContextEvents(){
         context.eventProducer.addEventListener(this);
     }
+    
+    private void handleEvent(SplitfileProgressEvent ce){
+        JSONObject response = insertObject.getHandler().createJSONReplyMessage("progress");
+        response.put("event", "SplitfileProgress");
+        response.put("finalizedTotal", ce.finalizedTotal);
+        response.put("totalBlocks", ce.totalBlocks);
+        response.put("succeedBlocks", ce.succeedBlocks);
+        response.put("failedBlocks", ce.failedBlocks);
+        response.put("fatallyFailedBlocks", ce.fatallyFailedBlocks);
+        response.put("minSuccessFetchBlocks", ce.minSuccessFetchBlocks);
+        response.put("minSuccessfulBlocks", ce.minSuccessfulBlocks);
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+        if (ce.latestSuccess != null){
+            Timestamp latestSuccess = new Timestamp(ce.latestSuccess.getTime());
+            response.put("latestSuccess", latestSuccess.toLocalDateTime().toString());
+        }
+        if (ce.latestFailure != null){
+            Timestamp latestFailure = new Timestamp(ce.latestFailure.getTime());
+            response.put("latestFailure", latestFailure.toLocalDateTime().toString());
+        }
+        insertObject.getHandler().getWebSocket().send(response.toJSONString());
+    }
+    
+    private void handleEvent(StartedCompressionEvent ce){
+        JSONObject response = insertObject.getHandler().createJSONReplyMessage("progress");
+        response.put("event", "StartedCompression");
+        response.put("codec", ce.codec.name);
+        insertObject.getHandler().getWebSocket().send(response.toJSONString());
+    }
+    
+    private void handleEvent(FinishedCompressionEvent ce){
+        JSONObject response = insertObject.getHandler().createJSONReplyMessage("progress");
+        response.put("event", "FinishedCompression");
+        response.put("codec", ce.codec);
+        response.put("originalSize", ce.originalSize);
+        response.put("compressedSize", ce.compressedSize);
+        insertObject.getHandler().getWebSocket().send(response.toJSONString());
+    }
+    
+    private void handleEvent(ExpectedHashesEvent ce){
+        JSONObject response = insertObject.getHandler().createJSONReplyMessage("progress");
+        response.put("event", "ExpectedHashes");
+        response.put("hashesLength", ce.hashes.length);
+        insertObject.getHandler().getWebSocket().send(response.toJSONString());
+    }
+    
+    private void handleEvent(ClientEvent ce){
+        JSONObject response = insertObject.getHandler().createJSONReplyMessage("progress");
+        response.put("event", ce.getClass().getName());
+        insertObject.getHandler().getWebSocket().send(response.toJSONString());
+    }
+    
+    
 }
