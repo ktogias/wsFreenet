@@ -12,21 +12,19 @@ import freenet.client.InsertContext;
 import freenet.client.InsertException;
 import freenet.client.async.ClientPutter;
 import freenet.keys.FreenetURI;
-import freenet.node.RequestStarter;
 import freenet.pluginmanager.PluginRespirator;
 import freenet.support.api.RandomAccessBucket;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
-import org.java_websocket.WebSocket;
 
 /**
  *
  * @author ktogias
  */
 class DataInsert {
-    private Handler handler;
+    private final Handler handler;
     private final String refmid;
     private final String contentType;
     private final String insertKey;
@@ -90,7 +88,8 @@ class DataInsert {
         InsertBlock ib = new InsertBlock(bucket, metadata, insertUri);
         HighLevelSimpleClient client = pr.getHLSimpleClient();
         InsertContext ictx =client.getInsertContext(true);
-        InsertCallback callback = new InsertCallback(this, bucket, false, realtime);
+        InsertCallback callback = new InsertCallback(this, ictx, bucket, false, realtime);
+        callback.subscribeToContextEvents();
         ClientPutter pu = 
             client.insert(ib, null, false, ictx, callback, priority);
         callback.setClientPutter(pu);

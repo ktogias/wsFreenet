@@ -5,11 +5,14 @@
  */
 package plugins.WSFreenet;
 
+import freenet.client.InsertContext;
 import freenet.client.InsertException;
 import freenet.client.async.BaseClientPutter;
 import freenet.client.async.ClientContext;
 import freenet.client.async.ClientPutCallback;
 import freenet.client.async.ClientPutter;
+import freenet.client.events.ClientEvent;
+import freenet.client.events.ClientEventListener;
 import freenet.keys.FreenetURI;
 import freenet.node.RequestClient;
 import freenet.support.api.Bucket;
@@ -21,18 +24,20 @@ import org.json.simple.JSONObject;
  *
  * @author ktogias
  */
-class InsertCallback implements ClientPutCallback, RequestClient{
+class InsertCallback implements ClientPutCallback, RequestClient, ClientEventListener{
     private final RandomAccessBucket bucket;
     private ClientPutter clientPutter;
     private final boolean persistent;
     private final boolean realtime;
     private final DataInsert insertObject;
+    private InsertContext context;
     
-    public InsertCallback(DataInsert insertObject, RandomAccessBucket bucket, boolean persistent, boolean realtime) {
+    public InsertCallback(DataInsert insertObject, InsertContext ictx, RandomAccessBucket bucket, boolean persistent, boolean realtime) {
         this.bucket = bucket;
         this.persistent = persistent;
         this.realtime = realtime;
         this.insertObject = insertObject;
+        this.context = ictx;
     }
     /**
      * Setter for clientPutter
@@ -42,7 +47,7 @@ class InsertCallback implements ClientPutCallback, RequestClient{
     public void setClientPutter(ClientPutter clientPutter) {
         this.clientPutter = clientPutter;
     }
-    
+
     /**
      * Method to cancel the insert
      *
@@ -119,5 +124,17 @@ class InsertCallback implements ClientPutCallback, RequestClient{
     @Override
     public boolean realTimeFlag() {
         return realtime;
+    }
+
+    @Override
+    public void receive(ClientEvent ce, ClientContext cc) {
+        JSONObject response = insertObject.getHandler().createJSONReplyMessage("status");
+        response.put("triger", "receive");
+        response.put("event", ce.getClass());
+        insertObject.getHandler().getWebSocket().send(response.toJSONString());
+    }
+
+    public void subscribeToContextEvents(){
+        context.eventProducer.addEventListener(this);
     }
 }
