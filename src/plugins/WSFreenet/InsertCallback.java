@@ -62,6 +62,7 @@ class InsertCallback implements ClientPutCallback, RequestClient, ClientEventLis
     public void cancel() {
         clientPutter.cancel(insertObject.getPluginRespirator().getNode().clientCore.clientContext);
         bucket.free();
+        unsubscribeFromContextEvents();
         insertObject.getHandler().getDataInserts().remove(insertObject);
         insertObject.getHandler().sendErrorReply("CANCELED" , "Data insert was canceled!");
     }
