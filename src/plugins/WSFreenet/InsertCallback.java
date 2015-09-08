@@ -94,12 +94,15 @@ class InsertCallback implements ClientPutCallback, RequestClient, ClientEventLis
         response.put("requestURI", bcp.getURI().toString());
         insertObject.getHandler().getWebSocket().send(response.toJSONString());
         bucket.free();
+        unsubscribeFromContextEvents();
         insertObject.getHandler().getDataInserts().remove(insertObject);
     }
 
     @Override
     public void onFailure(InsertException ie, BaseClientPutter bcp) {
         insertObject.getHandler().sendErrorReply("INSERT_FAILURE", "Insert failed");
+        bucket.free();
+        unsubscribeFromContextEvents();
         insertObject.getHandler().getDataInserts().remove(insertObject);
     }
 
@@ -148,6 +151,10 @@ class InsertCallback implements ClientPutCallback, RequestClient, ClientEventLis
 
     public void subscribeToContextEvents(){
         context.eventProducer.addEventListener(this);
+    }
+    
+    public void unsubscribeFromContextEvents(){
+        context.eventProducer.removeEventListener(this);
     }
     
     private void handleEvent(SplitfileProgressEvent ce){
