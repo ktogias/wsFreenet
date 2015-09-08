@@ -46,12 +46,6 @@ public class DataHandler extends Handler{
                 else if (action.equalsIgnoreCase("clearqueue")) {
                     handleClearQueue();
                 }
-                else if (action.equalsIgnoreCase("canreceivemetadata")){
-                    handleCanReceiveMetadata();
-                }
-                else if (action.equalsIgnoreCase("canreceivedata")){
-                    handleCanReceiveData();
-                }
                 else {
                     sendActionNotImplementedErrorReply();
                 }
@@ -64,10 +58,6 @@ public class DataHandler extends Handler{
     }
     
     private void handleInsert(){
-        if (!dataInserts.isEmpty() && !dataInserts.get(dataInserts.size()-1).hasGotData()){
-            this.sendBadRequestErrorReply("Last metadata message is waiting for data!");
-            return;
-        }
         String contentType = (String)jsonmessage.get("contentType");
         if (contentType == null){
             this.sendMissingFieldErrorReply("Missing contentType field!");
@@ -81,25 +71,30 @@ public class DataHandler extends Handler{
         String filename = (String)jsonmessage.get("filename");
         Short priority = (Short)jsonmessage.getOrDefault("priority", RequestStarter.INTERACTIVE_PRIORITY_CLASS);
         Boolean realtime = (Boolean)jsonmessage.getOrDefault("realtime", false);
-        dataInserts.add(new DataInsert(this, refmid, contentType, insertKey, filename, priority, realtime));
+        DataInsert newInsert = new DataInsert(this, refmid, contentType, insertKey, filename, priority, realtime);
+        dataInserts.add(newInsert);
         JSONObject response = createJSONReplyMessage("status");
         response.put("status", "INSERT_METADATA_RECEIVED");
+        response.put("hint", "wait for senddata request to send data");
         ws.send(response.toJSONString());
+        if (canRequestData()){
+            newInsert.requestData();
+        }
     }
     
     private void handleData(){
-        DataInsert lastInsert;
-        if (dataInserts.isEmpty() || (lastInsert = dataInserts.get(dataInserts.size()-1)).hasGotData()){
-            this.sendBadRequestErrorReply("No metadata message has been sent for this data!");
+        DataInsert insert;
+        if ((insert = getInsertWaitingForData()) == null){
+            this.sendBadRequestErrorReply("Data rejected: No metadata message has been received for this data!");
             return;
         }
-        lastInsert.setData(data);
-        this.refmid = lastInsert.getRefmid();
+        insert.setData(data);
+        this.refmid = insert.getRefmid();
         JSONObject response = createJSONReplyMessage("status");
         response.put("status", "INSERT_DATA_RECEIVED");
         ws.send(response.toJSONString());
         try {
-            lastInsert.insert();
+            insert.insert();
             response = createJSONReplyMessage("status");
             response.put("status", "INSERT_INITIATED");
             ws.send(response.toJSONString());
@@ -132,37 +127,25 @@ public class DataHandler extends Handler{
         }
     }
     
-    private void handleCanReceiveMetadata() {
-        try {
-            DataInsert lastInsert;
-            JSONObject response = createJSONReplyMessage("value");
-            if (dataInserts.isEmpty() || (lastInsert = dataInserts.get(dataInserts.size()-1)).hasGotData()){
-                response.put("value", true);
+    private Boolean canRequestData(){
+        Boolean canRequestData = true; 
+        for(DataInsert insert: dataInserts){
+            if (insert.requestForDataSent() && !insert.hasGotData()){
+                canRequestData = false;
+                break;
             }
-            else {
-                response.put("value", false);
-            }
-            ws.send(response.toJSONString());
         }
-        catch (Exception ex){
-            this.sendServerErrorReply(ex.getMessage()+" "+ex.toString());
-        }
+        return canRequestData;
     }
     
-    private void handleCanReceiveData() {
-        try {
-            DataInsert lastInsert;
-            JSONObject response = createJSONReplyMessage("value");
-            if (dataInserts.isEmpty() || (lastInsert = dataInserts.get(dataInserts.size()-1)).hasGotData()){
-                response.put("value", false);
+    private DataInsert getInsertWaitingForData(){
+        for(DataInsert insert: dataInserts){
+            if (insert.requestForDataSent() && !insert.hasGotData()){
+                return insert;
             }
-            else {
-                response.put("value", true);
-            }
-            ws.send(response.toJSONString());
         }
-        catch (Exception ex){
-            this.sendServerErrorReply(ex.getMessage()+" "+ex.toString());
-        }
+        return null;
     }
+
+    
 }

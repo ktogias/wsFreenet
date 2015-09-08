@@ -132,6 +132,14 @@ public abstract class Handler {
         return response;
     }
     
+    JSONObject createJSONRequestMessage(String action){
+        JSONObject request = new JSONObject();
+        request.put("type", "request");
+        request.put("refmid", refmid);
+        request.put("action", action);
+        return request;
+    }
+    
     List<DataInsert> getDataInserts(){
         return dataInserts;
     }
