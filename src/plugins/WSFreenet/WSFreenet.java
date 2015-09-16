@@ -25,6 +25,7 @@ import java.security.NoSuchProviderException;
 import java.security.SignatureException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -71,33 +72,22 @@ public class WSFreenet implements FredPlugin, FredPluginThreadless, FredPluginFC
             JSONObject config = readJsonConfig();
             serverPort = ((Long)config.getOrDefault("port", freenetPort.longValue()+1)).intValue();
             String [] allowedHosts = Util.JSONArrayToStringArray((JSONArray)config.getOrDefault("allowedHosts", new JSONArray()));
-            server = new WSFreenetServer(serverPort, allowedHosts, pr, INDYNET_PLUGIN_NAME, dataInserts);
+            JSONObject SSL = (JSONObject)config.getOrDefault("SSL", null);
+            Boolean enableSSL = false;
+            String keyStore = "";
+            String keyStorePassword = "";
+            String keyPassword = "";
+            if (SSL != null){
+                enableSSL = (Boolean)SSL.getOrDefault("enable", false);
+                keyStore = (String)SSL.getOrDefault("keyStore", "");
+                keyStorePassword = (String)SSL.getOrDefault("keyStorePassword", "");
+                keyPassword = (String)SSL.getOrDefault("keyPassword", "");
+            }
+            server = new WSFreenetServer(serverPort, allowedHosts, pr, INDYNET_PLUGIN_NAME, dataInserts, enableSSL, keyStore, keyStorePassword, keyPassword);
             server.start();
             serverStarted = true;
-        } catch (URISyntaxException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (ParseException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (KeyStoreException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (NoSuchAlgorithmException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (NoSuchProviderException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IllegalStateException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (SignatureException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (InvalidKeyException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (CertificateException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (UnrecoverableKeyException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (KeyManagementException ex) {
-            Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (Exception ex) {
+            Util.debug("debug.txt", ex.getClass().getName()+" "+ex.getMessage()+" "+Arrays.toString(ex.getStackTrace()));
         } 
     }
     

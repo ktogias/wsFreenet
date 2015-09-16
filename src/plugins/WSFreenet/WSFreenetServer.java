@@ -10,29 +10,22 @@ import freenet.pluginmanager.PluginRespirator;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.security.InvalidKeyException;
 import java.security.KeyManagementException;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
-import java.security.SecureRandom;
 import java.security.SignatureException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -40,8 +33,6 @@ import java.util.logging.Logger;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
-import javax.security.auth.x500.X500Principal;
-import org.bouncycastle.x509.X509V3CertificateGenerator;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.DefaultSSLWebSocketServerFactory;
@@ -58,7 +49,7 @@ public class WSFreenetServer extends WebSocketServer {
     Map<Integer, List<DataInsert>> dataInserts;
     boolean ssl;
 
-    public WSFreenetServer( int port, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts, boolean ssl, String sslKeystoreFile, String sslKeystoreFilePassword) throws UnknownHostException, KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException {
+    public WSFreenetServer( int port, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts, boolean ssl, String keyStore, String keyStorePassword, String keyPassword) throws UnknownHostException, KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException {
         super( new InetSocketAddress( port ) );
         this.allowedHosts = new AllowedHosts(String.join(",", allowedHosts));
         this.pr = pr;
@@ -66,15 +57,15 @@ public class WSFreenetServer extends WebSocketServer {
         this.dataInserts = dataInserts;
         this.ssl = ssl;
         if (ssl){
-            initSSL(sslKeystoreFile, sslKeystoreFilePassword);
+            initSSL(keyStore, keyStorePassword, keyPassword);
         }
     }
     
     public WSFreenetServer( int port, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, UnknownHostException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException{
-        this(port, allowedHosts, pr, indynetPluginName, dataInserts, false, "", "");
+        this(port, allowedHosts, pr, indynetPluginName, dataInserts, false, "", "", "");
     }
 
-    public WSFreenetServer( InetSocketAddress address, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts, boolean ssl,  String sslKeystoreFile, String sslKeystoreFilePassword) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException {
+    public WSFreenetServer( InetSocketAddress address, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts, boolean ssl,  String keyStore, String keyStorePassword, String keyPassword) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException {
         super( address );
         this.allowedHosts = new AllowedHosts(String.join(",", allowedHosts));
         this.pr = pr;
@@ -82,12 +73,12 @@ public class WSFreenetServer extends WebSocketServer {
         this.dataInserts = dataInserts;
         this.ssl = ssl;
         if (ssl){
-            initSSL(sslKeystoreFile, sslKeystoreFilePassword);
+            initSSL(keyStore, keyStorePassword, keyPassword);
         }
     }
     
     public WSFreenetServer( InetSocketAddress address, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, UnknownHostException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException{
-        this(address, allowedHosts, pr, indynetPluginName, dataInserts, false, "", "");
+        this(address, allowedHosts, pr, indynetPluginName, dataInserts, false, "", "", "");
     }
     
     @Override
@@ -144,54 +135,17 @@ public class WSFreenetServer extends WebSocketServer {
        
     }
     
-    private void initSSL(String filename, String password) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, CertificateEncodingException, IllegalStateException, SignatureException, InvalidKeyException, FileNotFoundException, IOException, CertificateException, UnrecoverableKeyException, KeyManagementException{
+    private void initSSL(String keyStore, String storePassword, String keyPassword) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, CertificateEncodingException, IllegalStateException, SignatureException, InvalidKeyException, FileNotFoundException, IOException, CertificateException, UnrecoverableKeyException, KeyManagementException{
         KeyStore keystore = KeyStore.getInstance( "JKS" );
-        File keyfile = new File( filename );
-        if(keyfile.exists() && !keyfile.isDirectory()) {
-             keystore.load( new FileInputStream( keyfile ), password.toCharArray());
-        }
-        else {
-            keystore.load(null, null);
-            X509Certificate cert = generateCertificate();
-            keystore.setCertificateEntry("default", cert);
-            keystore.store(new FileOutputStream(keyfile), password.toCharArray());
-        }
+        File keyfile = new File( keyStore );
+        keystore.load( new FileInputStream( keyfile ), storePassword.toCharArray());
         KeyManagerFactory kmf = KeyManagerFactory.getInstance( "SunX509" );
-        kmf.init( keystore, password.toCharArray() );
+        kmf.init( keystore, keyPassword.toCharArray() );
         TrustManagerFactory tmf = TrustManagerFactory.getInstance( "SunX509" );
         tmf.init( keystore );
         SSLContext sslContext = SSLContext.getInstance( "TLS" );
         sslContext.init( kmf.getKeyManagers(), tmf.getTrustManagers(), null );
         this.setWebSocketFactory(new DefaultSSLWebSocketServerFactory( sslContext ));
     }
-    
-    private X509Certificate generateCertificate() throws NoSuchAlgorithmException, NoSuchProviderException, CertificateEncodingException, IllegalStateException, SignatureException, InvalidKeyException{
-        // yesterday
-        Date validityBeginDate = new Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000);
-        // in 10 years
-        Date validityEndDate = new Date(System.currentTimeMillis() + 2 * 365 * 24 * 60 * 60 * 1000);
-        
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA", "BC");
-        keyPairGenerator.initialize(1024, new SecureRandom());
-        
-        KeyPair keyPair = keyPairGenerator.generateKeyPair();
-        
-        X509V3CertificateGenerator certGen = new X509V3CertificateGenerator();
-        X500Principal dnName = new X500Principal("CN=wsFreenet Plugin");
-        
-        certGen.setSerialNumber(BigInteger.valueOf(System.currentTimeMillis()));
-        certGen.setSubjectDN(dnName);
-        certGen.setIssuerDN(dnName); // use the same
-        certGen.setNotBefore(validityBeginDate);
-        certGen.setNotAfter(validityEndDate);
-        certGen.setPublicKey(keyPair.getPublic());
-        certGen.setSignatureAlgorithm("SHA256WithRSAEncryption");
-
-        X509Certificate cert = certGen.generate(keyPair.getPrivate(), "BC");
-        
-        return cert;
-
-    }
-
     
 }
