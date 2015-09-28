@@ -26,22 +26,25 @@ public abstract class Handler {
     protected String action;
     protected JSONObject jsonmessage;
     protected List<DataInsert> dataInserts;
+    protected List<DataFetch> dataFetches;
     
     
-    public Handler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts){
+    public Handler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts, List<DataFetch> dataFetches){
         this.ws = ws;
         this.message = message;
         this.pr = pr;
         this.indynetPluginName = indynetPluginName;
         this.dataInserts = dataInserts;
+        this.dataFetches = dataFetches;
     }
     
-    public Handler(WebSocket ws, ByteBuffer data, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts){
+    public Handler(WebSocket ws, ByteBuffer data, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts, List<DataFetch> dataFetches){
         this.ws = ws;
         this.data = data;
         this.pr = pr;
         this.indynetPluginName = indynetPluginName;
         this.dataInserts = dataInserts;
+        this.dataFetches = dataFetches;
     }
     
     public void handle() throws ParseException, MissingFieldException{
@@ -55,8 +58,6 @@ public abstract class Handler {
             if (action == null){
                 throw new MissingFieldException("No action specified!");
             }
-        }
-        else if (data != null){
         }
     }
     
@@ -142,6 +143,10 @@ public abstract class Handler {
     
     List<DataInsert> getDataInserts(){
         return dataInserts;
+    }
+    
+    List<DataFetch> getDataFetches(){
+        return dataFetches;
     }
     
     PluginRespirator getPluginRespirator(){

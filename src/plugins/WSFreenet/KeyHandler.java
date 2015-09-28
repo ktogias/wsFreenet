@@ -26,8 +26,8 @@ import org.json.simple.parser.ParseException;
  */
 public class KeyHandler extends Handler {
 
-    public KeyHandler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts) {
-        super(ws, message, pr, indynetPluginName, dataInserts);
+    public KeyHandler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts, List<DataFetch> dataFetches) {
+        super(ws, message, pr, indynetPluginName, dataInserts, dataFetches);
     }
 
     @Override
@@ -89,19 +89,10 @@ public class KeyHandler extends Handler {
         try {
             resolve(name);
         } catch (PluginNotFoundException ex) {
-            sendActionNotImplementedErrorReply("Indynet plugin is nit loaded!");
+            sendActionNotImplementedErrorReply("Indynet plugin is not loaded!");
         } catch (IOException ex) {
             sendServerErrorReply();
         }
-    }
-
-    private void resolve(String name) throws PluginNotFoundException, IOException {
-        FCPPluginConnection connection = pr.connectToOtherPlugin(indynetPluginName, new ResolveCallback());
-        SimpleFieldSet params = new SimpleFieldSet(false);
-        params.putSingle("action", "resolver.resolve");
-        params.putSingle("name", name);
-        FCPPluginMessage fcpMessage = FCPPluginMessage.construct(params, null);
-        connection.send(fcpMessage);
     }
     
     private void handleGenerate() {
@@ -121,6 +112,17 @@ public class KeyHandler extends Handler {
             return;
         }
         generate(type, filename, version);
+    }
+    
+    
+    
+    private void resolve(String name) throws PluginNotFoundException, IOException {
+        FCPPluginConnection connection = pr.connectToOtherPlugin(indynetPluginName, new ResolveCallback());
+        SimpleFieldSet params = new SimpleFieldSet(false);
+        params.putSingle("action", "resolver.resolve");
+        params.putSingle("name", name);
+        FCPPluginMessage fcpMessage = FCPPluginMessage.construct(params, null);
+        connection.send(fcpMessage);
     }
     
     private void generate(String type, String filename, int version){
@@ -143,6 +145,10 @@ public class KeyHandler extends Handler {
         response.put("insertURI", insertURI.toString());
         response.put("requestURI", requestURI.toString());
         ws.send(response.toJSONString());
+    }
+    
+    private void fetch(String key){
+        
     }
 
     private class RegisterCallback implements FredPluginFCPMessageHandler.ClientSideFCPMessageHandler {

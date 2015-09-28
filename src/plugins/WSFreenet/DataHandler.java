@@ -24,12 +24,12 @@ import org.json.simple.parser.ParseException;
  */
 public class DataHandler extends Handler{
 
-    public DataHandler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts) {
-        super(ws, message, pr, indynetPluginName, dataInserts);
+    public DataHandler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts, List<DataFetch> dataFetches) {
+        super(ws, message, pr, indynetPluginName, dataInserts, dataFetches);
     }
     
-    public DataHandler(WebSocket ws, ByteBuffer data, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts) {
-        super(ws, data, pr, indynetPluginName, dataInserts);
+    public DataHandler(WebSocket ws, ByteBuffer data, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts, List<DataFetch> dataFetches) {
+        super(ws, data, pr, indynetPluginName, dataInserts, dataFetches);
     }
     
     @Override
@@ -42,9 +42,11 @@ public class DataHandler extends Handler{
             else if (message != null){
                 if (action.equalsIgnoreCase("insert")) {
                     handleInsert();
+                } else if (action.equalsIgnoreCase("fetch")){
+                    handleFetch();
                 }
-                else if (action.equalsIgnoreCase("clearqueue")) {
-                    handleClearQueue();
+                else if (action.equalsIgnoreCase("clearinsertqueue")) {
+                    handleClearInsertQueue();
                 }
                 else {
                     sendActionNotImplementedErrorReply();
@@ -110,7 +112,7 @@ public class DataHandler extends Handler{
         
     }
 
-    private void handleClearQueue() {
+    private void handleClearInsertQueue() {
         try {
             JSONObject response = createJSONReplyMessage("success");
             if (!dataInserts.isEmpty()){
@@ -125,6 +127,19 @@ public class DataHandler extends Handler{
         catch (Exception ex){
             this.sendServerErrorReply(ex.getMessage()+" "+ex.toString());
         }
+    }
+    
+    private void handleFetch(){
+         String url = (String) jsonmessage.get("url");
+         Short priority = (Short)jsonmessage.getOrDefault("priority", RequestStarter.INTERACTIVE_PRIORITY_CLASS);
+         Boolean realtime = (Boolean)jsonmessage.getOrDefault("realtime", false);
+         if (url == null) {
+            this.sendMissingFieldErrorReply("Missing url field!");
+            return;
+        }
+        DataFetch newFetch = new DataFetch(this, refmid, url, priority, realtime);
+        newFetch.fetch();
+        dataFetches.add(newFetch);
     }
     
     private Boolean canRequestData(){
