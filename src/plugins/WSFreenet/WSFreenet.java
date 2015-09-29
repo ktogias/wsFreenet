@@ -40,12 +40,14 @@ public class WSFreenet implements FredPlugin, FredPluginThreadless, FredPluginFC
     Integer serverPort;
     Boolean serverStarted = false;
     Map<Integer, List<DataInsert>> dataInserts;
+    Map<Integer, List<DataFetch>> dataFetches;
     
     @Override
     public void terminate() {
         try {
             server.stop();
             dataInserts.clear();
+            dataFetches.clear();
         } catch (IOException ex) {
             Logger.getLogger(WSFreenet.class.getName()).log(Level.SEVERE, null, ex);
         } catch (InterruptedException ex) {
@@ -57,24 +59,46 @@ public class WSFreenet implements FredPlugin, FredPluginThreadless, FredPluginFC
     public void runPlugin(PluginRespirator pr) {
         try {
             dataInserts = new ConcurrentHashMap<Integer, List<DataInsert>>();
+            dataFetches = new ConcurrentHashMap<Integer, List<DataFetch>>();
             String url = pr.getToadletContainer().getURL();
             URI uri = new URI(url);
             Integer freenetPort = uri.getPort();
             JSONObject config = readJsonConfig();
-            serverPort = ((Long)config.getOrDefault("port", freenetPort.longValue()+1)).intValue();
-            String [] allowedHosts = Util.JSONArrayToStringArray((JSONArray)config.getOrDefault("allowedHosts", new JSONArray()));
-            JSONObject SSL = (JSONObject)config.getOrDefault("SSL", null);
+            try {
+            serverPort = ((Long)config.get("port")).intValue();
+            }
+            catch (NullPointerException ex){
+                serverPort = freenetPort+1;
+            }
+             String [] allowedHosts;
+            try {
+            allowedHosts = Util.JSONArrayToStringArray((JSONArray)config.get("allowedHosts"));
+            }
+            catch (NullPointerException ex){
+                allowedHosts = Util.JSONArrayToStringArray(new JSONArray());
+            }
+            JSONObject SSL = (JSONObject)config.get("SSL");
             Boolean enableSSL = false;
             String keyStore = "";
             String keyStorePassword = "";
             String keyPassword = "";
             if (SSL != null){
-                enableSSL = (Boolean)SSL.getOrDefault("enable", false);
-                keyStore = (String)SSL.getOrDefault("keyStore", "");
-                keyStorePassword = (String)SSL.getOrDefault("keyStorePassword", "");
-                keyPassword = (String)SSL.getOrDefault("keyPassword", "");
+                enableSSL = (Boolean)SSL.get("enable");
+                keyStore = (String)SSL.get("keyStore");
+                if (keyStore == null){
+                    keyStore = "";
+                }
+                keyStorePassword = (String)SSL.get("keyStorePassword");
+                if (keyStorePassword == null){
+                    keyStorePassword = "";
+                }
+                
+                keyPassword = (String)SSL.get("keyPassword");
+                if (keyPassword == null){
+                    keyPassword = "";
+                }
             }
-            server = new WSFreenetServer(serverPort, allowedHosts, pr, INDYNET_PLUGIN_NAME, dataInserts, enableSSL, keyStore, keyStorePassword, keyPassword);
+            server = new WSFreenetServer(serverPort, allowedHosts, pr, INDYNET_PLUGIN_NAME, dataInserts, dataFetches, enableSSL, keyStore, keyStorePassword, keyPassword);
             server.start();
             serverStarted = true;
         } catch (Exception ex) {

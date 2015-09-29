@@ -47,38 +47,53 @@ public class WSFreenetServer extends WebSocketServer {
     PluginRespirator pr;
     String indynetPluginName;
     Map<Integer, List<DataInsert>> dataInserts;
+    Map<Integer, List<DataFetch>> dataFetches;
     boolean ssl;
 
-    public WSFreenetServer( int port, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts, boolean ssl, String keyStore, String keyStorePassword, String keyPassword) throws UnknownHostException, KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException {
+    public WSFreenetServer( int port, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts, Map<Integer, List<DataFetch>> dataFetches, boolean ssl, String keyStore, String keyStorePassword, String keyPassword) throws UnknownHostException, KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException {
         super( new InetSocketAddress( port ) );
-        this.allowedHosts = new AllowedHosts(String.join(",", allowedHosts));
+        String allowedHostsStr = "";
+        int i;
+        for (i=0 ; i< allowedHosts.length-1; i++){
+            allowedHostsStr += allowedHosts[i]+",";
+        }
+        allowedHostsStr += allowedHosts[i];
+        this.allowedHosts = new AllowedHosts(allowedHostsStr);
         this.pr = pr;
         this.indynetPluginName = indynetPluginName;
         this.dataInserts = dataInserts;
+        this.dataFetches = dataFetches;
         this.ssl = ssl;
         if (ssl){
             initSSL(keyStore, keyStorePassword, keyPassword);
         }
     }
     
-    public WSFreenetServer( int port, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, UnknownHostException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException{
-        this(port, allowedHosts, pr, indynetPluginName, dataInserts, false, "", "", "");
+    public WSFreenetServer( int port, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts, Map<Integer, List<DataFetch>> dataFetches) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, UnknownHostException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException{
+        this(port, allowedHosts, pr, indynetPluginName, dataInserts, dataFetches, false, "", "", "");
     }
 
-    public WSFreenetServer( InetSocketAddress address, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts, boolean ssl,  String keyStore, String keyStorePassword, String keyPassword) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException {
+    public WSFreenetServer( InetSocketAddress address, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts, Map<Integer, List<DataFetch>> dataFetches, boolean ssl,  String keyStore, String keyStorePassword, String keyPassword) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException {
         super( address );
-        this.allowedHosts = new AllowedHosts(String.join(",", allowedHosts));
+        String allowedHostsStr = "";
+        int i;
+        for (i=0 ; i< allowedHosts.length-1; i++){
+            allowedHostsStr += allowedHosts[i]+",";
+        }
+        allowedHostsStr += allowedHosts[i];
+        this.allowedHosts = new AllowedHosts(allowedHostsStr);
         this.pr = pr;
         this.indynetPluginName = indynetPluginName;
         this.dataInserts = dataInserts;
+        this.dataFetches = dataFetches;
         this.ssl = ssl;
         if (ssl){
             initSSL(keyStore, keyStorePassword, keyPassword);
         }
     }
     
-    public WSFreenetServer( InetSocketAddress address, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, UnknownHostException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException{
-        this(address, allowedHosts, pr, indynetPluginName, dataInserts, false, "", "", "");
+    public WSFreenetServer( InetSocketAddress address, String[] allowedHosts, PluginRespirator pr, String indynetPluginName, Map<Integer, List<DataInsert>> dataInserts, Map<Integer, List<DataFetch>> dataFetches) throws KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, IllegalStateException, SignatureException, InvalidKeyException, IOException, UnknownHostException, FileNotFoundException, CertificateException, CertificateEncodingException, UnrecoverableKeyException, KeyManagementException{
+        this(address, allowedHosts, pr, indynetPluginName, dataInserts, dataFetches, false, "", "", "");
     }
     
     @Override
@@ -90,19 +105,22 @@ public class WSFreenetServer extends WebSocketServer {
     
         Collections.synchronizedList(new ArrayList<DataInsert>());
         dataInserts.put(ws.hashCode(), Collections.synchronizedList(new ArrayList<DataInsert>()));
+        dataFetches.put(ws.hashCode(), Collections.synchronizedList(new ArrayList<DataFetch>()));
     }
 
     @Override
     public void onClose(WebSocket ws, int i, String string, boolean bln) {
         dataInserts.get(ws.hashCode()).clear();
+        dataFetches.get(ws.hashCode()).clear();
         dataInserts.remove(ws.hashCode());
+        dataFetches.remove(ws.hashCode());
     }
 
     @Override
     public void onMessage(WebSocket ws, String message) {
         try {
             String resource = ws.getResourceDescriptor();
-            Handler handler = Util.getHandler(resource, ws, message, pr, indynetPluginName, dataInserts.get(ws.hashCode()));
+            Handler handler = Util.getHandler(resource, ws, message, pr, indynetPluginName, dataInserts.get(ws.hashCode()), dataFetches.get(ws.hashCode()));
             handler.handle();
         } catch (ClassNotFoundException ex) {
             ws.send(Util.getNotFoundErrorReply().toJSONString());
@@ -119,7 +137,7 @@ public class WSFreenetServer extends WebSocketServer {
     public void onMessage(WebSocket ws, ByteBuffer data) {
         try {
             String resource = ws.getResourceDescriptor();
-            Handler handler = Util.getHandler(resource, ws, data, pr, indynetPluginName, dataInserts.get(ws.hashCode()));
+            Handler handler = Util.getHandler(resource, ws, data, pr, indynetPluginName, dataInserts.get(ws.hashCode()), dataFetches.get(ws.hashCode()));
             handler.handle();
         } catch (ClassNotFoundException ex) {
             ws.close(404, "Resource not found");

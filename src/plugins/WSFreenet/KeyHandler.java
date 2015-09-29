@@ -15,9 +15,15 @@ import freenet.pluginmanager.PluginNotFoundException;
 import freenet.pluginmanager.PluginRespirator;
 import freenet.support.SimpleFieldSet;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.java_websocket.WebSocket;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 /**
@@ -101,8 +107,17 @@ public class KeyHandler extends Handler {
             this.sendMissingFieldErrorReply("Missing type field!");
             return;
         }
-        String filename = (String) jsonmessage.getOrDefault("filename", "");
-        int version = ((Long) jsonmessage.getOrDefault("version", new Long(0))).intValue();
+        String filename = (String) jsonmessage.get("filename");
+        if (filename == null){
+            filename = "";
+        }
+        int version;
+        try {
+            version = ((Long) jsonmessage.get("version")).intValue();
+        }
+        catch (NullPointerException ex){
+            version = 0;
+        }
         if (version < 0){
             this.sendWrongFieldValueErrorReply("Version number must not be negative");
             return;
@@ -171,21 +186,64 @@ public class KeyHandler extends Handler {
         @Override
         public FCPPluginMessage handlePluginFCPMessage(FCPPluginConnection fcppc, FCPPluginMessage fcppm) {
             if (fcppm.success) {
-                JSONObject response = createJSONReplyMessage("found");
+                if (fcppm.params.get("status").equals("final")){
+                    JSONObject response = createJSONReplyMessage("success");
+                    response.put("requestKey", fcppm.params.get("requestKey"));
+                    ws.send(response.toJSONString());
+                }
+                else {
+                    if (fcppm.data != null && fcppm.params.get("dataMimeType").equalsIgnoreCase("application/json")){
+                        InputStream is = null;
+                        try {
+                            JSONObject response = createJSONReplyMessage("progress");
+                            response.put("status", "success");
+                            is = fcppm.data.getInputStream();
+                            String iString = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
+                            JSONParser parser = new JSONParser();
+                            JSONObject resolveObject = (JSONObject) parser.parse(iString);
+                            response.put("resolveObject", resolveObject);
+                            ws.send(response.toJSONString());
+                        } catch (Exception ex) {
+                            JSONObject response = createJSONReplyMessage("progress");
+                            response.put("status", "error");
+                            response.put("exception", ex.getClass().getName());
+                            response.put("mesage", ex.getMessage());
+                            ws.send(response.toJSONString());
+                        } finally {
+                            try {
+                                is.close();
+                            } catch (IOException ex) {
+                                JSONObject response = createJSONReplyMessage("progress");
+                                response.put("status", "error");
+                                response.put("exception", ex.getClass().getName());
+                                response.put("mesage", ex.getMessage());
+                                ws.send(response.toJSONString());
+                            }
+                        }
+                    }
+                }
+            } else if (!fcppm.errorCode.equals("")){
                 try {
-                    JSONObject resolveObject = parseJSONMessage(fcppm.params.get("json"));
-                    response.put("answer", resolveObject);
+                    JSONObject response = createJSONReplyMessage("failure");
+                    response.put("errorcode", fcppm.errorCode);
+                    JSONParser parser = new JSONParser();
+                    JSONObject errorMessage = (JSONObject) parser.parse(fcppm.errorMessage);
+                    response.put("errorMessage", errorMessage);
                     ws.send(response.toJSONString());
                 } catch (ParseException ex) {
-                    sendJsonParseErrorReply("Error parshing returned object!");
+                    JSONObject response = createJSONReplyMessage("failure");
+                    response.put("errorcode", fcppm.errorCode);
+                    response.put("errorMessage", "An error occured while parsing error message!");
+                    ws.send(response.toJSONString());
                 }
-                
-            } else {
-                JSONObject response = createJSONReplyMessage("not found");
-                JSONObject answer = new JSONObject();
-                answer.put("errorcode", fcppm.errorCode);
-                answer.put("errormessage", fcppm.errorMessage);
-                response.put("answer", answer);
+            }
+            else {
+                JSONObject response = createJSONReplyMessage("progress");
+                Iterator<String> keyIterator = fcppm.params.keyIterator();
+                while (keyIterator.hasNext()){
+                    String key = keyIterator.next();
+                    response.put(key, fcppm.params.get(key));
+                }
                 ws.send(response.toJSONString());
             }
             return FCPPluginMessage.construct();

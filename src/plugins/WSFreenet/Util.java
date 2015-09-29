@@ -47,22 +47,22 @@ public class Util {
         }
     }
     
-    static public Handler getHandler(String resource, WebSocket ws, String message, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts) throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException{
+    static public Handler getHandler(String resource, WebSocket ws, String message, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts, List<DataFetch> dataFetches) throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException{
         resource = resource.substring(1,2).toUpperCase() + resource.substring(2).toLowerCase();
         Class<?> handler = Class.forName("plugins.WSFreenet."+resource+"Handler");
-        Class[] types = {WebSocket.class, String.class, PluginRespirator.class, String.class, List.class};
+        Class[] types = {WebSocket.class, String.class, PluginRespirator.class, String.class, List.class, List.class};
         Constructor constructor = handler.getConstructor(types);
-        Object[] parameters = {ws, message, pr, indynetPluginName, dataInserts};
+        Object[] parameters = {ws, message, pr, indynetPluginName, dataInserts, dataFetches};
         Handler handlerInstance = (Handler)constructor.newInstance(parameters);
         return handlerInstance;
     }
     
-    static public Handler getHandler(String resource, WebSocket ws, ByteBuffer data, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts) throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException{
+    static public Handler getHandler(String resource, WebSocket ws, ByteBuffer data, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts, List<DataFetch> dataFetches) throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException{
         resource = resource.substring(1,2).toUpperCase() + resource.substring(2).toLowerCase();
         Class<?> handler = Class.forName("plugins.WSFreenet."+resource+"Handler");
-        Class[] types = {WebSocket.class, ByteBuffer.class, PluginRespirator.class, String.class, List.class};
+        Class[] types = {WebSocket.class, ByteBuffer.class, PluginRespirator.class, String.class, List.class, List.class};
         Constructor constructor = handler.getConstructor(types);
-        Object[] parameters = {ws, data, pr, indynetPluginName, dataInserts};
+        Object[] parameters = {ws, data, pr, indynetPluginName, dataInserts, dataFetches};
         Handler handlerInstance = (Handler)constructor.newInstance(parameters);
         return handlerInstance;
     }

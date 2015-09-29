@@ -12,8 +12,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.java_websocket.WebSocket;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
@@ -22,33 +20,30 @@ import org.json.simple.parser.ParseException;
  *
  * @author ktogias
  */
-public class DataHandler extends Handler{
+public class DataHandler extends Handler {
 
     public DataHandler(WebSocket ws, String message, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts, List<DataFetch> dataFetches) {
         super(ws, message, pr, indynetPluginName, dataInserts, dataFetches);
     }
-    
+
     public DataHandler(WebSocket ws, ByteBuffer data, PluginRespirator pr, String indynetPluginName, List<DataInsert> dataInserts, List<DataFetch> dataFetches) {
         super(ws, data, pr, indynetPluginName, dataInserts, dataFetches);
     }
-    
+
     @Override
     public void handle() {
         try {
             super.handle();
-            if (data != null){
+            if (data != null) {
                 handleData();
-            }
-            else if (message != null){
+            } else if (message != null) {
                 if (action.equalsIgnoreCase("insert")) {
                     handleInsert();
-                } else if (action.equalsIgnoreCase("fetch")){
+                } else if (action.equalsIgnoreCase("fetch")) {
                     handleFetch();
-                }
-                else if (action.equalsIgnoreCase("clearinsertqueue")) {
+                } else if (action.equalsIgnoreCase("clearinsertqueue")) {
                     handleClearInsertQueue();
-                }
-                else {
+                } else {
                     sendActionNotImplementedErrorReply();
                 }
             }
@@ -58,35 +53,42 @@ public class DataHandler extends Handler{
             sendMissingFieldErrorReply(ex.getMessage());
         }
     }
-    
-    private void handleInsert(){
-        String contentType = (String)jsonmessage.get("contentType");
-        if (contentType == null){
+
+    private void handleInsert() {
+        String contentType = (String) jsonmessage.get("contentType");
+        if (contentType == null) {
             this.sendMissingFieldErrorReply("Missing contentType field!");
             return;
         }
-        String insertKey = (String)jsonmessage.get("insertKey");
-        if (insertKey == null){
+        String insertKey = (String) jsonmessage.get("insertKey");
+        if (insertKey == null) {
             this.sendMissingFieldErrorReply("Missing insertKey field!");
             return;
         }
-        String filename = (String)jsonmessage.get("filename");
-        Short priority = (Short)jsonmessage.getOrDefault("priority", RequestStarter.INTERACTIVE_PRIORITY_CLASS);
-        Boolean realtime = (Boolean)jsonmessage.getOrDefault("realtime", false);
+        String filename = (String) jsonmessage.get("filename");
+        Short priority = (Short) jsonmessage.get("priority");
+        if (priority == null) {
+            priority = RequestStarter.INTERACTIVE_PRIORITY_CLASS;
+        }
+
+        Boolean realtime = (Boolean) jsonmessage.get("realtime");
+        if (realtime == null) {
+            realtime = false;
+        }
         DataInsert newInsert = new DataInsert(this, refmid, contentType, insertKey, filename, priority, realtime);
         dataInserts.add(newInsert);
         JSONObject response = createJSONReplyMessage("status");
         response.put("status", "INSERT_METADATA_RECEIVED");
         response.put("hint", "wait for senddata request to send data");
         ws.send(response.toJSONString());
-        if (canRequestData()){
+        if (canRequestData()) {
             newInsert.requestData();
         }
     }
-    
-    private void handleData(){
+
+    private void handleData() {
         DataInsert insert;
-        if ((insert = getInsertWaitingForData()) == null){
+        if ((insert = getInsertWaitingForData()) == null) {
             this.sendBadRequestErrorReply("Data rejected: No metadata message has been received for this data!");
             return;
         }
@@ -100,8 +102,8 @@ public class DataHandler extends Handler{
             response = createJSONReplyMessage("status");
             response.put("status", "INSERT_INITIATED");
             ws.send(response.toJSONString());
-        } catch (MalformedURLException ex){
-            this.sendWrongFieldValueErrorReply("Wrong insert Key or filename! "+ex.getMessage());
+        } catch (MalformedURLException ex) {
+            this.sendWrongFieldValueErrorReply("Wrong insert Key or filename! " + ex.getMessage());
         } catch (InsertWithEmptyDataException ex) {
             this.sendServerErrorReply(ex.getMessage());
         } catch (IOException ex) {
@@ -109,58 +111,62 @@ public class DataHandler extends Handler{
         } catch (InsertException ex) {
             this.sendServerErrorReply(ex.getMessage());
         }
-        
+
     }
 
     private void handleClearInsertQueue() {
         try {
             JSONObject response = createJSONReplyMessage("success");
-            if (!dataInserts.isEmpty()){
+            if (!dataInserts.isEmpty()) {
                 dataInserts.clear();
                 response.put("message", "Insert queue cleared");
-            }
-            else {
+            } else {
                 response.put("message", "Insert queue already empty");
             }
             ws.send(response.toJSONString());
-        }
-        catch (Exception ex){
-            this.sendServerErrorReply(ex.getMessage()+" "+ex.toString());
+        } catch (Exception ex) {
+            this.sendServerErrorReply(ex.getMessage() + " " + ex.toString());
         }
     }
-    
-    private void handleFetch(){
-         String url = (String) jsonmessage.get("url");
-         Short priority = (Short)jsonmessage.getOrDefault("priority", RequestStarter.INTERACTIVE_PRIORITY_CLASS);
-         Boolean realtime = (Boolean)jsonmessage.getOrDefault("realtime", false);
-         if (url == null) {
+
+    private void handleFetch() {
+        String url = (String) jsonmessage.get("url");
+        if (url == null) {
             this.sendMissingFieldErrorReply("Missing url field!");
             return;
         }
+        Short priority = (Short) jsonmessage.get("priority");
+        if (priority == null) {
+            priority = RequestStarter.INTERACTIVE_PRIORITY_CLASS;
+        }
+        Boolean realtime = (Boolean) jsonmessage.get("realtime");
+        if (realtime == null) {
+            realtime = false;
+        }
+
         DataFetch newFetch = new DataFetch(this, refmid, url, priority, realtime);
         newFetch.fetch();
         dataFetches.add(newFetch);
     }
-    
-    private Boolean canRequestData(){
-        Boolean canRequestData = true; 
-        for(DataInsert insert: dataInserts){
-            if (insert.requestForDataSent() && !insert.hasGotData()){
+
+    private Boolean canRequestData() {
+        Boolean canRequestData = true;
+        for (DataInsert insert : dataInserts) {
+            if (insert.requestForDataSent() && !insert.hasGotData()) {
                 canRequestData = false;
                 break;
             }
         }
         return canRequestData;
     }
-    
-    private DataInsert getInsertWaitingForData(){
-        for(DataInsert insert: dataInserts){
-            if (insert.requestForDataSent() && !insert.hasGotData()){
+
+    private DataInsert getInsertWaitingForData() {
+        for (DataInsert insert : dataInserts) {
+            if (insert.requestForDataSent() && !insert.hasGotData()) {
                 return insert;
             }
         }
         return null;
     }
 
-    
 }
