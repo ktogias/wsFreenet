@@ -170,12 +170,20 @@ public class KeyHandler extends Handler {
 
         @Override
         public FCPPluginMessage handlePluginFCPMessage(FCPPluginConnection fcppc, FCPPluginMessage fcppm) {
-            if (fcppm.success) {
+            if (fcppm.success && fcppm.params.get("origin").equalsIgnoreCase("Resolver")) {
                 JSONObject response = createJSONReplyMessage("success");
                 response.put("resolveURI", fcppm.params.get("resolveURI"));
                 ws.send(response.toJSONString());
-            } else {
-                sendServerErrorReply(fcppm.errorCode + " " + fcppm.errorMessage);
+            } else if (fcppm.params.get("origin").equalsIgnoreCase("Resolver") 
+                    && fcppm.params.get("status").equalsIgnoreCase("Failure")){
+                sendServerErrorReply(fcppm.errorCode);
+            } else if (fcppm.params.get("origin").equalsIgnoreCase("InsertCallback") 
+                    && fcppm.params.get("status").equalsIgnoreCase("ReceivedEvent")){
+                JSONObject response = createJSONReplyMessage("progress");
+                response.put("eventclass", fcppm.params.get("eventclass"));
+                response.put("eventcode", fcppm.params.get("eventcode"));
+                response.put("eventdescription", fcppm.params.get("eventdescription"));
+                ws.send(response.toJSONString());
             }
             return FCPPluginMessage.construct();
         }
@@ -185,65 +193,19 @@ public class KeyHandler extends Handler {
 
         @Override
         public FCPPluginMessage handlePluginFCPMessage(FCPPluginConnection fcppc, FCPPluginMessage fcppm) {
-            if (fcppm.success) {
-                if (fcppm.params.get("status").equals("final")){
-                    JSONObject response = createJSONReplyMessage("success");
-                    response.put("requestKey", fcppm.params.get("requestKey"));
-                    ws.send(response.toJSONString());
-                }
-                else {
-                    if (fcppm.data != null && fcppm.params.get("dataMimeType").equalsIgnoreCase("application/json")){
-                        InputStream is = null;
-                        try {
-                            JSONObject response = createJSONReplyMessage("progress");
-                            response.put("status", "success");
-                            is = fcppm.data.getInputStream();
-                            String iString = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
-                            JSONParser parser = new JSONParser();
-                            JSONObject resolveObject = (JSONObject) parser.parse(iString);
-                            response.put("resolveObject", resolveObject);
-                            ws.send(response.toJSONString());
-                        } catch (Exception ex) {
-                            JSONObject response = createJSONReplyMessage("progress");
-                            response.put("status", "error");
-                            response.put("exception", ex.getClass().getName());
-                            response.put("mesage", ex.getMessage());
-                            ws.send(response.toJSONString());
-                        } finally {
-                            try {
-                                is.close();
-                            } catch (IOException ex) {
-                                JSONObject response = createJSONReplyMessage("progress");
-                                response.put("status", "error");
-                                response.put("exception", ex.getClass().getName());
-                                response.put("mesage", ex.getMessage());
-                                ws.send(response.toJSONString());
-                            }
-                        }
-                    }
-                }
-            } else if (!fcppm.errorCode.equals("")){
-                try {
-                    JSONObject response = createJSONReplyMessage("failure");
-                    response.put("errorcode", fcppm.errorCode);
-                    JSONParser parser = new JSONParser();
-                    JSONObject errorMessage = (JSONObject) parser.parse(fcppm.errorMessage);
-                    response.put("errorMessage", errorMessage);
-                    ws.send(response.toJSONString());
-                } catch (ParseException ex) {
-                    JSONObject response = createJSONReplyMessage("failure");
-                    response.put("errorcode", fcppm.errorCode);
-                    response.put("errorMessage", "An error occured while parsing error message!");
-                    ws.send(response.toJSONString());
-                }
-            }
-            else {
+            if (fcppm.success && fcppm.params.get("origin").equalsIgnoreCase("Resolver")) {
+                JSONObject response = createJSONReplyMessage("success");
+                response.put("requestKey", fcppm.params.get("requestKey"));
+                ws.send(response.toJSONString());
+            } else if (fcppm.params.get("origin").equalsIgnoreCase("Resolver") 
+                    && fcppm.params.get("status").equalsIgnoreCase("Failure")){
+                sendServerErrorReply(fcppm.errorCode);
+            } else if (fcppm.params.get("origin").equalsIgnoreCase("InsertCallback") 
+                    && fcppm.params.get("status").equalsIgnoreCase("ReceivedEvent")){
                 JSONObject response = createJSONReplyMessage("progress");
-                Iterator<String> keyIterator = fcppm.params.keyIterator();
-                while (keyIterator.hasNext()){
-                    String key = keyIterator.next();
-                    response.put(key, fcppm.params.get(key));
-                }
+                response.put("eventclass", fcppm.params.get("eventclass"));
+                response.put("eventcode", fcppm.params.get("eventcode"));
+                response.put("eventdescription", fcppm.params.get("eventdescription"));
                 ws.send(response.toJSONString());
             }
             return FCPPluginMessage.construct();
