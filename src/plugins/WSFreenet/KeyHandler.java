@@ -10,6 +10,7 @@ import freenet.clients.fcp.FCPPluginMessage;
 import freenet.crypt.RandomSource;
 import freenet.keys.FreenetURI;
 import freenet.keys.InsertableClientSSK;
+import freenet.node.FSParseException;
 import freenet.pluginmanager.FredPluginFCPMessageHandler;
 import freenet.pluginmanager.PluginNotFoundException;
 import freenet.pluginmanager.PluginRespirator;
@@ -172,7 +173,7 @@ public class KeyHandler extends Handler {
         public FCPPluginMessage handlePluginFCPMessage(FCPPluginConnection fcppc, FCPPluginMessage fcppm) {
             if (fcppm.success && fcppm.params.get("origin").equalsIgnoreCase("Resolver")) {
                 JSONObject response = createJSONReplyMessage("success");
-                response.put("resolveURI", fcppm.params.get("resolveURI"));
+                response.put("insertedURI", fcppm.params.get("insertedURI"));
                 ws.send(response.toJSONString());
             } else if (fcppm.params.get("origin").equalsIgnoreCase("Resolver") 
                     && fcppm.params.get("status").equalsIgnoreCase("Failure")){
@@ -180,9 +181,12 @@ public class KeyHandler extends Handler {
             } else if (fcppm.params.get("origin").equalsIgnoreCase("InsertCallback") 
                     && fcppm.params.get("status").equalsIgnoreCase("ReceivedEvent")){
                 JSONObject response = createJSONReplyMessage("progress");
-                response.put("eventclass", fcppm.params.get("eventclass"));
-                response.put("eventcode", fcppm.params.get("eventcode"));
-                response.put("eventdescription", fcppm.params.get("eventdescription"));
+                try {
+                    JSONObject obj = Util.SimpleFieldSetToJSONObject(fcppm.params);
+                    response.putAll(obj);
+                } catch (FSParseException ex) {
+                    response.put("error", Util.exceptionToJson(ex));
+                }
                 ws.send(response.toJSONString());
             }
             return FCPPluginMessage.construct();
@@ -203,9 +207,12 @@ public class KeyHandler extends Handler {
             } else if (fcppm.params.get("origin").equalsIgnoreCase("InsertCallback") 
                     && fcppm.params.get("status").equalsIgnoreCase("ReceivedEvent")){
                 JSONObject response = createJSONReplyMessage("progress");
-                response.put("eventclass", fcppm.params.get("eventclass"));
-                response.put("eventcode", fcppm.params.get("eventcode"));
-                response.put("eventdescription", fcppm.params.get("eventdescription"));
+                try {
+                    JSONObject obj = Util.SimpleFieldSetToJSONObject(fcppm.params);
+                    response.putAll(obj);
+                } catch (FSParseException ex) {
+                    response.put("error", Util.exceptionToJson(ex));
+                }
                 ws.send(response.toJSONString());
             }
             return FCPPluginMessage.construct();

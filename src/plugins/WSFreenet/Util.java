@@ -5,14 +5,16 @@
  */
 package plugins.WSFreenet;
 
+import freenet.node.FSParseException;
 import freenet.pluginmanager.PluginRespirator;
+import freenet.support.SimpleFieldSet;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -129,5 +131,25 @@ public class Util {
         return getErrorReply(refmid, "501", message);
     }
     
+    static public JSONObject SimpleFieldSetToJSONObject(SimpleFieldSet params) throws FSParseException{
+        JSONObject obj = new JSONObject();
+        Iterator<String> keyIterator = params.keyIterator();
+        while (keyIterator.hasNext()){
+            String key = keyIterator.next();
+            obj.put(key, params.get(key));
+        }
+        return obj;
+    }
     
+    public static JSONObject exceptionToJson(Exception ex) {
+        JSONObject errorObject = new JSONObject();
+        errorObject.put("exception", ex.getClass().getName());
+        errorObject.put("message", ex.getMessage());
+        JSONArray trace = new JSONArray();
+        for (StackTraceElement element: ex.getStackTrace()){
+            trace.add(element.toString());
+        }
+        errorObject.put("trace", trace);
+        return errorObject;
+    }
 }
