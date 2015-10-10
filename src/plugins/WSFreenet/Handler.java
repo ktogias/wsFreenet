@@ -121,11 +121,11 @@ public abstract class Handler {
         ws.send(Util.getBadRequestErrorReply(refmid, message).toJSONString());
     }
     
-    JSONObject parseJSONMessage(String message) throws ParseException{
+    public JSONObject parseJSONMessage(String message) throws ParseException{
         return Util.parseJSONMessage(message);
     }
     
-    JSONObject createJSONReplyMessage(String result){
+    public JSONObject createJSONReplyMessage(String result){
         JSONObject response = new JSONObject();
         response.put("type", "reply");
         response.put("refmid", refmid);
@@ -133,7 +133,7 @@ public abstract class Handler {
         return response;
     }
     
-    JSONObject createJSONRequestMessage(String action){
+    public JSONObject createJSONRequestMessage(String action){
         JSONObject request = new JSONObject();
         request.put("type", "request");
         request.put("refmid", refmid);
@@ -141,20 +141,24 @@ public abstract class Handler {
         return request;
     }
     
-    List<DataInsert> getDataInserts(){
+    public List<DataInsert> getDataInserts(){
         return dataInserts;
     }
     
-    List<DataFetch> getDataFetches(){
+    public List<DataFetch> getDataFetches(){
         return dataFetches;
     }
     
-    PluginRespirator getPluginRespirator(){
+    public PluginRespirator getPluginRespirator(){
         return pr;
     }
     
-    WebSocket getWebSocket(){
+    public WebSocket getWebSocket(){
         return ws;
+    }
+    
+    public String getIndynetPluginName(){
+        return indynetPluginName;
     }
 
 }

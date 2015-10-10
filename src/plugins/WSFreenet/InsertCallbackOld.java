@@ -30,7 +30,7 @@ import org.json.simple.JSONObject;
  *
  * @author ktogias
  */
-class InsertCallback implements ClientPutCallback, RequestClient, ClientEventListener{
+class InsertCallbackOld implements ClientPutCallback, RequestClient, ClientEventListener{
     private final RandomAccessBucket bucket;
     private ClientPutter clientPutter;
     private final boolean persistent;
@@ -38,7 +38,7 @@ class InsertCallback implements ClientPutCallback, RequestClient, ClientEventLis
     private final DataInsert insertObject;
     private InsertContext context;
     
-    public InsertCallback(DataInsert insertObject, InsertContext ictx, RandomAccessBucket bucket, boolean persistent, boolean realtime) {
+    public InsertCallbackOld(DataInsert insertObject, InsertContext ictx, RandomAccessBucket bucket, boolean persistent, boolean realtime) {
         this.bucket = bucket;
         this.persistent = persistent;
         this.realtime = realtime;

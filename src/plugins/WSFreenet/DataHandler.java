@@ -7,11 +7,14 @@ package plugins.WSFreenet;
 
 import freenet.client.InsertException;
 import freenet.node.RequestStarter;
+import freenet.pluginmanager.PluginNotFoundException;
 import freenet.pluginmanager.PluginRespirator;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.java_websocket.WebSocket;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
@@ -66,16 +69,27 @@ public class DataHandler extends Handler {
             return;
         }
         String filename = (String) jsonmessage.get("filename");
+        
+        Integer version = (Integer) jsonmessage.get("version");
+        if (version == null) {
+            version = -1;
+        }
+        
         Short priority = (Short) jsonmessage.get("priority");
         if (priority == null) {
             priority = RequestStarter.INTERACTIVE_PRIORITY_CLASS;
+        }
+        
+        Boolean persistent = (Boolean) jsonmessage.get("persistent");
+        if (persistent == null) {
+            persistent = false;
         }
 
         Boolean realtime = (Boolean) jsonmessage.get("realtime");
         if (realtime == null) {
             realtime = false;
         }
-        DataInsert newInsert = new DataInsert(this, refmid, contentType, insertKey, filename, priority, realtime);
+        DataInsert newInsert = new DataInsert(this, refmid, contentType, insertKey, filename, version, priority, persistent, realtime);
         dataInserts.add(newInsert);
         JSONObject response = createJSONReplyMessage("status");
         response.put("status", "INSERT_METADATA_RECEIVED");
@@ -109,6 +123,8 @@ public class DataHandler extends Handler {
         } catch (IOException ex) {
             this.sendServerErrorReply(ex.getMessage());
         } catch (InsertException ex) {
+            this.sendServerErrorReply(ex.getMessage());
+        } catch (PluginNotFoundException ex) {
             this.sendServerErrorReply(ex.getMessage());
         }
 

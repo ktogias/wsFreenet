@@ -12,8 +12,14 @@ import freenet.client.InsertContext;
 import freenet.client.InsertException;
 import freenet.client.async.ClientPutter;
 import freenet.client.events.SimpleEventProducer;
+import freenet.clients.fcp.FCPPluginConnection;
+import freenet.clients.fcp.FCPPluginMessage;
 import freenet.keys.FreenetURI;
+import freenet.node.FSParseException;
+import freenet.pluginmanager.FredPluginFCPMessageHandler;
+import freenet.pluginmanager.PluginNotFoundException;
 import freenet.pluginmanager.PluginRespirator;
+import freenet.support.SimpleFieldSet;
 import freenet.support.api.RandomAccessBucket;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -32,18 +38,22 @@ class DataInsert {
     private final String insertKey;
     private final String filename;
     private final Short priority;
+    private final Boolean persistent;
     private final Boolean realtime;
+    private final int version;
     private ByteBuffer data = null;
     private Boolean requestForDataSent;
     
     
 
-    public DataInsert(Handler handler, String refmid, String contentType, String insertKey, String filename, Short priority, Boolean realtime) {
+    public DataInsert(Handler handler, String refmid, String contentType, String insertKey, String filename, int version, Short priority, Boolean persistent, Boolean realtime) {
         this.refmid = refmid;
         this.contentType = contentType;
         this.insertKey = insertKey;
         this.filename = filename;
+        this.version = version;
         this.priority = priority;
+        this.persistent = persistent;
         this.realtime = realtime;
         this.handler = handler;
         this.requestForDataSent = false;
@@ -73,7 +83,7 @@ class DataInsert {
         return handler;
     }
 
-    public void insert() throws InsertWithEmptyDataException, IOException, InsertException, MalformedURLException{
+    public void insert() throws InsertWithEmptyDataException, IOException, InsertException, MalformedURLException, PluginNotFoundException{
         if (this.data == null){
             throw new InsertWithEmptyDataException("Insert called but data is empty!");
         }
@@ -84,23 +94,18 @@ class DataInsert {
         os.write(data.array());
         os.close(); 
         bucket.setReadOnly();
-        ClientMetadata metadata = new ClientMetadata(contentType);
-        String key = insertKey;
-        if (!filename.isEmpty()){
-            if (!key.endsWith("/")){
-                key+= "/";
-            }
-            key+=filename;
-        }
-        FreenetURI insertUri = new FreenetURI(insertKey+filename);
-        InsertBlock ib = new InsertBlock(bucket, metadata, insertUri);
-        HighLevelSimpleClient client = pr.getHLSimpleClient();
-        InsertContext ictx = new InsertContext(client.getInsertContext(true), new SimpleEventProducer());
-        InsertCallback callback = new InsertCallback(this, ictx, bucket, false, realtime);
-        callback.subscribeToContextEvents();
-        ClientPutter pu = 
-            client.insert(ib, null, false, ictx, callback, priority);
-        callback.setClientPutter(pu);
+        FCPPluginConnection connection = pr.connectToOtherPlugin(handler.getIndynetPluginName(), new InsertCallback());
+        SimpleFieldSet params = new SimpleFieldSet(false);
+        params.putSingle("action", "insertData");
+        params.putSingle("insertKey", insertKey);
+        params.putSingle("filename", filename);
+        params.putSingle("contentType", contentType);
+        params.put("version", version);
+        params.put("persistent", persistent);
+        params.put("realtime", realtime);
+        params.put("priorityClass", priority);
+        FCPPluginMessage fcpMessage = FCPPluginMessage.construct(params, bucket);
+        connection.send(fcpMessage);
     }
     
     public void requestData() {
@@ -120,6 +125,32 @@ class DataInsert {
         }
         catch (IndexOutOfBoundsException e){
             return null;
+        }
+    }
+    
+    private class InsertCallback implements FredPluginFCPMessageHandler.ClientSideFCPMessageHandler {
+
+        @Override
+        public FCPPluginMessage handlePluginFCPMessage(FCPPluginConnection fcppc, FCPPluginMessage fcppm) {
+            if (fcppm.success && fcppm.params.get("origin").equalsIgnoreCase("DataInsert")) {
+                JSONObject response = handler.createJSONReplyMessage("success");
+                response.put("insertedURI", fcppm.params.get("insertedURI"));
+                handler.getWebSocket().send(response.toJSONString());
+            } else if (fcppm.params.get("origin").equalsIgnoreCase("DataInsert") 
+                    && fcppm.params.get("status").equalsIgnoreCase("Failure")){
+                handler.sendServerErrorReply(fcppm.errorCode);
+            } else if (fcppm.params.get("origin").equalsIgnoreCase("InsertCallback") 
+                    && fcppm.params.get("status").equalsIgnoreCase("ReceivedEvent")){
+                JSONObject response = handler.createJSONReplyMessage("progress");
+                try {
+                    JSONObject obj = Util.SimpleFieldSetToJSONObject(fcppm.params);
+                    response.putAll(obj);
+                } catch (FSParseException ex) {
+                    response.put("error", Util.exceptionToJson(ex));
+                }
+                handler.getWebSocket().send(response.toJSONString());
+            }
+            return FCPPluginMessage.construct();
         }
     }
     
