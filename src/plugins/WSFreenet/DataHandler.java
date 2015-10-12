@@ -44,6 +44,10 @@ public class DataHandler extends Handler {
                     handleInsert();
                 } else if (action.equalsIgnoreCase("fetch")) {
                     handleFetch();
+                } else if (action.equalsIgnoreCase("sendmimetype")){
+                    handleSendMimeType();
+                } else if (action.equalsIgnoreCase("senddata")){
+                    handleSendData();
                 } else if (action.equalsIgnoreCase("clearinsertqueue")) {
                     handleClearInsertQueue();
                 } else {
@@ -146,23 +150,75 @@ public class DataHandler extends Handler {
     }
 
     private void handleFetch() {
-        String url = (String) jsonmessage.get("url");
-        if (url == null) {
-            this.sendMissingFieldErrorReply("Missing url field!");
+        try {
+            String url = (String) jsonmessage.get("url");
+            if (url == null) {
+                this.sendMissingFieldErrorReply("Missing url field!");
+                return;
+            }
+            Short priority = (Short) jsonmessage.get("priority");
+            if (priority == null) {
+                priority = RequestStarter.INTERACTIVE_PRIORITY_CLASS;
+            }
+            Boolean realtime = (Boolean) jsonmessage.get("realtime");
+            if (realtime == null) {
+                realtime = false;
+            }
+            Boolean persistent = (Boolean) jsonmessage.get("persistent");
+            if (persistent == null) {
+                persistent = false;
+            }
+            
+            DataFetch newFetch = new DataFetch(this, refmid, url, priority, persistent, realtime);
+            newFetch.fetch();
+            dataFetches.add(newFetch);
+            JSONObject response = createJSONReplyMessage("status");
+            response.put("status", "FETCH_STARTED");
+            response.put("hint", "wait for dataready message");
+            ws.send(response.toJSONString());
+        } catch (PluginNotFoundException ex) {
+            this.sendServerErrorReply("Indynet plugin is not loaded!");
+        } catch (IOException ex) {
+            this.sendServerErrorReply("Interplugin communication error!");
+        }
+    }
+    
+    private void handleSendMimeType(){
+        String fetchmid = (String) jsonmessage.get("fetchmid");
+        if (fetchmid == null) {
+            this.sendMissingFieldErrorReply("Missing fetchmid field!");
             return;
         }
-        Short priority = (Short) jsonmessage.get("priority");
-        if (priority == null) {
-            priority = RequestStarter.INTERACTIVE_PRIORITY_CLASS;
+        DataFetch fetch = getDataFetch(fetchmid);
+        if (fetch == null){
+            this.sendBadRequestErrorReply("Fetch request not found!");
+            return;
         }
-        Boolean realtime = (Boolean) jsonmessage.get("realtime");
-        if (realtime == null) {
-            realtime = false;
+        JSONObject response = createJSONReplyMessage("success");
+        try {
+            response.put("mimeType", fetch.getMimeType());
+            ws.send(response.toJSONString());
+        } catch (GetMimeTypeWithEmptyMimeTypeException ex) {
+           this.sendBadRequestErrorReply("MimeType is empty!");
         }
-
-        DataFetch newFetch = new DataFetch(this, refmid, url, priority, realtime);
-        newFetch.fetch();
-        dataFetches.add(newFetch);
+    }
+    
+    private void handleSendData(){
+        String fetchmid = (String) jsonmessage.get("fetchmid");
+        if (fetchmid == null) {
+            this.sendMissingFieldErrorReply("Missing fetchmid field!");
+            return;
+        }
+        DataFetch fetch = getDataFetch(fetchmid);
+        if (fetch == null){
+            this.sendBadRequestErrorReply("Fetch request not found!");
+            return;
+        }
+        try {
+            ws.send(fetch.getData());
+        } catch (GetDataWithEmptyDataException ex) {
+            this.sendBadRequestErrorReply("Data is empty!");
+        }
     }
 
     private Boolean canRequestData() {
@@ -180,6 +236,16 @@ public class DataHandler extends Handler {
         for (DataInsert insert : dataInserts) {
             if (insert.requestForDataSent() && !insert.hasGotData()) {
                 return insert;
+            }
+        }
+        return null;
+    }
+    
+    
+    private DataFetch getDataFetch(String fetchmid){
+        for (DataFetch fetch : dataFetches) {
+            if (fetch.getRefmid().equals(fetchmid)){
+                return fetch;
             }
         }
         return null;

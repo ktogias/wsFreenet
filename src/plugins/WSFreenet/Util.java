@@ -8,7 +8,14 @@ package plugins.WSFreenet;
 import freenet.node.FSParseException;
 import freenet.pluginmanager.PluginRespirator;
 import freenet.support.SimpleFieldSet;
+import freenet.support.api.Bucket;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Constructor;
@@ -151,5 +158,17 @@ public class Util {
         }
         errorObject.put("trace", trace);
         return errorObject;
+    }
+    
+    public static ByteBuffer bucketToByteBuffer(Bucket data) throws IOException{
+        int bufSize = 4096;
+        byte [] buf = new byte[bufSize];
+        InputStream is = data.getInputStream();
+        ByteArrayOutputStream os = new ByteArrayOutputStream(bufSize);
+        int r;
+        while((r = is.read(buf)) != -1){
+            os.write(buf,0,r);
+        }  
+        return ByteBuffer.wrap(os.toByteArray());
     }
 }

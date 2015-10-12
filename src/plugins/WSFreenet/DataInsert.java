@@ -5,16 +5,9 @@
  */
 package plugins.WSFreenet;
 
-import freenet.client.ClientMetadata;
-import freenet.client.HighLevelSimpleClient;
-import freenet.client.InsertBlock;
-import freenet.client.InsertContext;
 import freenet.client.InsertException;
-import freenet.client.async.ClientPutter;
-import freenet.client.events.SimpleEventProducer;
 import freenet.clients.fcp.FCPPluginConnection;
 import freenet.clients.fcp.FCPPluginMessage;
-import freenet.keys.FreenetURI;
 import freenet.node.FSParseException;
 import freenet.pluginmanager.FredPluginFCPMessageHandler;
 import freenet.pluginmanager.PluginNotFoundException;
@@ -139,6 +132,7 @@ class DataInsert {
             } else if (fcppm.params.get("origin").equalsIgnoreCase("DataInsert") 
                     && fcppm.params.get("status").equalsIgnoreCase("Failure")){
                 handler.sendServerErrorReply(fcppm.errorCode);
+                getHandler().getDataInserts().remove(DataInsert.this);
             } else if (fcppm.params.get("origin").equalsIgnoreCase("InsertCallback") 
                     && fcppm.params.get("status").equalsIgnoreCase("ReceivedEvent")){
                 JSONObject response = handler.createJSONReplyMessage("progress");

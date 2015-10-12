@@ -35,14 +35,14 @@ import org.json.simple.JSONObject;
  *
  * @author ktogias
  */
-class FetchCallback implements ClientGetCallback, RequestClient, ClientEventListener{
+class FetchCallbackOld implements ClientGetCallback, RequestClient, ClientEventListener{
     private ClientGetter clientGetter;
     private final DataFetch fetchObject;
     private final FetchContext context;
     boolean persistent;
     boolean realtime;
     
-    public FetchCallback(DataFetch fetchObject, FetchContext fctx, boolean persistent, boolean realtime) {
+    public FetchCallbackOld(DataFetch fetchObject, FetchContext fctx, boolean persistent, boolean realtime) {
         this.fetchObject = fetchObject;
         this.context = fctx;
         this.persistent = persistent;
