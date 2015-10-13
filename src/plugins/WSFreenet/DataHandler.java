@@ -13,8 +13,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.java_websocket.WebSocket;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.ParseException;
@@ -50,7 +48,9 @@ public class DataHandler extends Handler {
                     handleSendData();
                 } else if (action.equalsIgnoreCase("clearinsertqueue")) {
                     handleClearInsertQueue();
-                } else {
+                } else if (action.equalsIgnoreCase("clearfetchqueue")) {
+                    handleClearFetchQueue();
+                }else {
                     sendActionNotImplementedErrorReply();
                 }
             }
@@ -218,6 +218,21 @@ public class DataHandler extends Handler {
             ws.send(fetch.getData());
         } catch (GetDataWithEmptyDataException ex) {
             this.sendBadRequestErrorReply("Data is empty!");
+        }
+    }
+    
+    private void handleClearFetchQueue() {
+        try {
+            JSONObject response = createJSONReplyMessage("success");
+            if (!dataFetches.isEmpty()) {
+                dataFetches.clear();
+                response.put("message", "Fetch queue cleared");
+            } else {
+                response.put("message", "Fetch queue already empty");
+            }
+            ws.send(response.toJSONString());
+        } catch (Exception ex) {
+            this.sendServerErrorReply(ex.getMessage() + " " + ex.toString());
         }
     }
 
